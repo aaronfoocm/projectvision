@@ -24,7 +24,12 @@ export function parseCsv1(content: string): Csv1Row[] {
 }
 
 export function parseCsv2(content: string): Csv2Row[] {
-  const rows = parseTsv<Csv2Row>(content, false, false)
+  // The Sales Details export has several metadata rows before the real header.
+  // Find the first line that contains the known anchor column and start from there.
+  const lines = content.split('\n')
+  const headerIdx = lines.findIndex(l => l.includes('Koppiku Ref #'))
+  const trimmed = headerIdx > 0 ? lines.slice(headerIdx).join('\n') : content
+  const rows = parseTsv<Csv2Row>(trimmed, false, false)
   return rows.filter(row => Object.values(row as unknown as Record<string, string>).some(v => v !== ''))
 }
 
