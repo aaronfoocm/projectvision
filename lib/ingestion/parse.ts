@@ -18,7 +18,7 @@ export function parseCsv1(content: string): Csv1Row[] {
 
 export function parseCsv2(content: string): Csv2Row[] {
   const rows = parseTsv<Csv2Row>(content, false, false)
-  return rows.filter(row => Object.values(row as Record<string, string>).some(v => v !== ''))
+  return rows.filter(row => Object.values(row as unknown as Record<string, string>).some(v => v !== ''))
 }
 
 export function parseCsv3(content: string): Csv3Row[] {
