@@ -1,16 +1,17 @@
+import Link from 'next/link'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 
 // ── Calendar builder ─────────────────────────────────────────────────────────
-function buildWeeks(today: Date): { date: Date; iso: string }[][] {
-  // Start on the Sunday at or before (today − 364 days)
-  const start = new Date(today)
+function buildWeeks(windowEnd: Date): { date: Date; iso: string }[][] {
+  const start = new Date(windowEnd)
   start.setDate(start.getDate() - 364)
   start.setDate(start.getDate() - start.getDay()) // rewind to Sunday
 
   const weeks: { date: Date; iso: string }[][] = []
   const cur = new Date(start)
 
-  while (cur <= today) {
+  while (cur <= windowEnd) {
     const week: { date: Date; iso: string }[] = []
     for (let d = 0; d < 7; d++) {
       week.push({ date: new Date(cur), iso: cur.toISOString().slice(0, 10) })
@@ -34,13 +35,29 @@ function cellColor(count: number, max: number): string {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-export default async function DatabasePage() {
+function fmt(d: Date) {
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+export default async function DatabasePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ offset?: string }>
+}) {
+  const { offset: rawOffset } = await searchParams
+  const offsetWeeks = Math.max(0, parseInt(rawOffset ?? '0', 10) || 0)
+
   const supabase = await createClient()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const yearAgo = new Date(today)
-  yearAgo.setDate(yearAgo.getDate() - 364)
+  // Window end = today shifted back by offsetWeeks
+  const windowEnd = new Date(today)
+  windowEnd.setDate(windowEnd.getDate() - offsetWeeks * 7)
+
+  const windowStart = new Date(windowEnd)
+  windowStart.setDate(windowStart.getDate() - 364)
 
   const [
     { data: txnDates },
@@ -52,7 +69,8 @@ export default async function DatabasePage() {
     supabase
       .from('transactions')
       .select('transaction_date')
-      .gte('transaction_date', yearAgo.toISOString().slice(0, 10)),
+      .gte('transaction_date', windowStart.toISOString().slice(0, 10))
+      .lte('transaction_date', windowEnd.toISOString().slice(0, 10)),
     supabase.from('customers').select('*', { count: 'exact', head: true }),
     supabase.from('transactions').select('*', { count: 'exact', head: true }),
     supabase
@@ -77,18 +95,19 @@ export default async function DatabasePage() {
   }
 
   const maxCount = Math.max(0, ...countByDate.values())
-  const weeks = buildWeeks(today)
+  const weeks = buildWeeks(windowEnd)
 
   const lastTxnDate = dateRange?.[0]?.transaction_date
     ? String(dateRange[0].transaction_date).slice(0, 10)
     : null
 
-  const todayIso = today.toISOString().slice(0, 10)
   const daysSinceUpdate = lastTxnDate
     ? Math.floor((today.getTime() - new Date(lastTxnDate).getTime()) / 86_400_000)
     : null
 
-  // Month label positions: record which week-column each month first appears in
+  const todayIso = today.toISOString().slice(0, 10)
+
+  // Month label positions
   const monthLabels: { col: number; label: string }[] = []
   let lastMonth = -1
   weeks.forEach((week, col) => {
@@ -98,6 +117,9 @@ export default async function DatabasePage() {
       lastMonth = m
     }
   })
+
+  const prevOffset = offsetWeeks + 52
+  const nextOffset = Math.max(0, offsetWeeks - 52)
 
   return (
     <div className="p-8 max-w-5xl">
@@ -130,13 +152,36 @@ export default async function DatabasePage() {
       {/* ── Heatmap ── */}
       <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-white font-semibold text-sm">Transactions per day — last 52 weeks</p>
-          <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <span>Less</span>
-            {['bg-stone-800', 'bg-amber-950', 'bg-amber-800', 'bg-amber-600', 'bg-amber-400', 'bg-amber-300'].map(c => (
-              <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
-            ))}
-            <span>More</span>
+          <div>
+            <p className="text-white font-semibold text-sm">Transactions per day</p>
+            <p className="text-stone-500 text-xs mt-0.5">{fmt(windowStart)} — {fmt(windowEnd)}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-stone-500">
+              <span>Less</span>
+              {['bg-stone-800', 'bg-amber-950', 'bg-amber-800', 'bg-amber-600', 'bg-amber-400', 'bg-amber-300'].map(c => (
+                <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
+              ))}
+              <span>More</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Link
+                href={`/dashboard/database?offset=${prevOffset}`}
+                className="p-1.5 rounded-lg border border-stone-700 text-stone-400 hover:text-white hover:border-stone-600 transition-colors"
+                title="Earlier"
+              >
+                <ChevronLeft size={14} />
+              </Link>
+              <Link
+                href={offsetWeeks === 0 ? '#' : `/dashboard/database?offset=${nextOffset}`}
+                className={`p-1.5 rounded-lg border border-stone-700 text-stone-400 transition-colors ${
+                  offsetWeeks === 0 ? 'opacity-30 pointer-events-none' : 'hover:text-white hover:border-stone-600'
+                }`}
+                title="Later"
+              >
+                <ChevronRight size={14} />
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -154,7 +199,6 @@ export default async function DatabasePage() {
               })}
             </div>
 
-            {/* Grid: 7 rows (days) × N cols (weeks) */}
             <div className="flex gap-0.5">
               {/* Day labels */}
               <div className="flex flex-col gap-0.5 mr-1">
@@ -175,7 +219,7 @@ export default async function DatabasePage() {
                       <div
                         key={iso}
                         title={isFuture ? '' : `${iso}: ${count.toLocaleString()} transaction${count !== 1 ? 's' : ''}`}
-                        className={`w-3.5 h-3.5 rounded-sm transition-opacity ${
+                        className={`w-3.5 h-3.5 rounded-sm ${
                           isFuture ? 'opacity-0' : cellColor(count, maxCount)
                         } ${iso === todayIso ? 'ring-1 ring-white/40' : ''}`}
                       />
