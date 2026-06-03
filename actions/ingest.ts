@@ -82,8 +82,6 @@ export async function batchIngestCustomers(
     first_name: r.first_name,
     last_name: r.last_name,
     email: r.email,
-    points_balance: r.points_balance,
-    points_prev_balance: r.points_prev_balance,
     is_active: r.is_active,
     current_loc_code: r.current_loc_code,
     last_updated: today,
@@ -249,7 +247,10 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
     const avgItemQty = parentItems.length > 0 ? parentItems.reduce((s, i) => s + i.item_qty, 0) / parentItems.length : 0
     const hasBigOrder = parentItems.some(i => i.item_qty >= 5)
 
-    const pointsBalance = meta?.points_balance ?? 0
+    const prevPointsBalance = meta?.points_balance ?? 0
+    const pointsAwarded = billItems.reduce((s, i) => s + i.point_awarded, 0)
+    const pointsRedeemed = billItems.reduce((s, i) => s + i.point_redeemed, 0)
+    const pointsBalance = Math.max(0, prevPointsBalance + pointsAwarded - pointsRedeemed)
     const voucherRedeemed = meta?.voucher_redeemed ?? 0
 
     const favouriteOutlet = [...outletCodes]
@@ -301,6 +302,8 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
       crm_id: customerId,
       segment,
       rfm_r: null, rfm_f: null, rfm_m: null,
+      points_balance: pointsBalance,
+      points_prev_balance: prevPointsBalance,
       total_visits: totalVisits,
       last_visit_date: lastVisit,
       first_visit_date: firstVisit,
