@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { LayoutDashboard, Zap, Users, Upload, Coffee } from 'lucide-react'
+import { LayoutDashboard, Zap, Users, Upload, Coffee, DatabaseZap } from 'lucide-react'
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/actions', label: 'Actions', icon: Zap },
   { href: '/dashboard/customers', label: 'Customers', icon: Users },
   { href: '/dashboard/upload', label: 'Upload', icon: Upload },
+  { href: '/dashboard/database', label: 'Database', icon: DatabaseZap },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
