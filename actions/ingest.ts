@@ -22,59 +22,69 @@ export interface CustomerUploadResult {
 }
 
 export async function ingestCustomers(formData: FormData): Promise<CustomerUploadResult> {
-  const supabase = createServiceClient()
   const errors: string[] = []
   const result: CustomerUploadResult = { totalProcessed: 0, newCustomers: 0, errors }
 
-  const file = formData.get('csv3') as File | null
-  if (!file) { errors.push('Customer file is required.'); return result }
+  try {
+    const supabase = createServiceClient()
 
-  const text = await file.text()
-  const csv3 = parseCsv3(text)
+    const file = formData.get('csv3') as File | null
+    if (!file) { errors.push('Customer file is required.'); return result }
 
-  const missing = detectMissingColumns(csv3 as unknown as Record<string, string>[], CSV3_REQUIRED)
-  if (missing.length) errors.push(`Missing columns: ${missing.join(', ')}`)
+    const text = await file.text()
+    const csv3 = parseCsv3(text)
 
-  // Fetch existing to detect new customers
-  const { data: existing } = await supabase.from('customers').select('crm_id')
-  const existingIds = new Set((existing ?? []).map(c => c.crm_id))
+    if (csv3.length === 0) { errors.push('File appears empty or could not be parsed.'); return result }
 
-  const today = new Date().toISOString()
-  const customersToUpsert: Partial<Customer>[] = []
+    const missing = detectMissingColumns(csv3 as unknown as Record<string, string>[], CSV3_REQUIRED)
+    if (missing.length) errors.push(`Missing columns: ${missing.join(', ')}`)
 
-  for (const row of csv3) {
-    const crmId = row.crm_id || row.id
-    if (!crmId) continue
+    // Fetch existing to detect new customers
+    const { data: existing } = await supabase.from('customers').select('crm_id')
+    const existingIds = new Set((existing ?? []).map(c => c.crm_id))
 
-    if (!existingIds.has(crmId)) result.newCustomers++
+    const today = new Date().toISOString()
 
-    customersToUpsert.push({
-      crm_id: crmId,
-      mobile: row['Mobile Number']?.replace(/^\+/, '').replace(/\s/g, '') || null,
-      first_name: row['First Name'] || null,
-      last_name: row['Last Name'] || null,
-      email: row['Email'] || null,
-      points_balance: parseFloat(row['Cashback Rewards Points']) || 0,
-      points_prev_balance: parseFloat(row['Cashback Prev Rewards Points']) || 0,
-      current_loc_code: row['Current Loc Code'] || null,
-      is_active: parseInt(row['Is Active']) || 1,
-      // Preserve segment/rfm if already set — don't overwrite with null
-      last_updated: today,
-    })
+    // Build upsert rows — only include columns we're updating, preserving segment/rfm
+    const customersToUpsert = csv3
+      .map(row => {
+        const crmId = row.crm_id || row.id
+        if (!crmId) return null
+        if (!existingIds.has(crmId)) result.newCustomers++
+        return {
+          crm_id: crmId,
+          mobile: (row['Mobile Number'] ?? '').replace(/^\+/, '').replace(/\s/g, '') || null,
+          first_name: row['First Name'] || null,
+          last_name: row['Last Name'] || null,
+          email: row['Email'] || null,
+          points_balance: parseFloat(row['Cashback Rewards Points']) || 0,
+          points_prev_balance: parseFloat(row['Cashback Prev Rewards Points']) || 0,
+          current_loc_code: row['Current Loc Code'] || null,
+          is_active: parseInt(row['Is Active'] ?? '1') || 1,
+          last_updated: today,
+        }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+
+    if (customersToUpsert.length) {
+      const { error } = await supabase
+        .from('customers')
+        .upsert(customersToUpsert, { onConflict: 'crm_id' })
+      if (error) errors.push(`Database error: ${error.message}`)
+    }
+
+    await supabase.from('upload_log').insert([{
+      file_type: 'customers',
+      row_count: csv3.length,
+      status: errors.length ? 'partial' : 'success',
+      error_message: errors[0] ?? null,
+    }])
+
+    result.totalProcessed = customersToUpsert.length
+  } catch (e) {
+    errors.push(`Unexpected error: ${e instanceof Error ? e.message : String(e)}`)
   }
 
-  if (customersToUpsert.length) {
-    const { error } = await supabase
-      .from('customers')
-      .upsert(customersToUpsert as unknown[], { onConflict: 'crm_id', ignoreDuplicates: false })
-    if (error) errors.push(`customers upsert: ${error.message}`)
-  }
-
-  await supabase.from('upload_log').insert([
-    { file_type: 'customers', row_count: csv3.length, status: errors.length ? 'partial' : 'success', error_message: errors[0] ?? null },
-  ])
-
-  result.totalProcessed = customersToUpsert.length
   return result
 }
 

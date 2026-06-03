@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
-import { Upload, CheckCircle, AlertCircle, Loader2, Users, Receipt } from 'lucide-react'
+import { Upload, CheckCircle, AlertCircle, Loader2, Users, Receipt, BookOpen } from 'lucide-react'
 import { ingestCustomers, ingestTransactions, ingestRedemptionMenu } from '@/actions/ingest'
 import type { UploadSummary } from '@/lib/types'
 import type { CustomerUploadResult } from '@/actions/ingest'
@@ -120,11 +120,75 @@ function CustomerPanel() {
   )
 }
 
+// ─── Redemption menu panel ────────────────────────────────────────────────────
+function RedemptionMenuPanel() {
+  const [file, setFile] = useState<File | null>(null)
+  const [processing, setProcessing] = useState(false)
+  const [count, setCount] = useState<number | null>(null)
+  const [error, setError] = useState('')
+
+  async function handleProcess() {
+    if (!file) { setError('Please upload the redemption menu file.'); return }
+    setError(''); setProcessing(true)
+    try {
+      const fd = new FormData()
+      fd.append('redemption_menu', file)
+      const r = await ingestRedemptionMenu(fd)
+      if (r.error) setError(r.error)
+      else setCount(r.count)
+    } catch (e) { setError(String(e)) }
+    finally { setProcessing(false) }
+  }
+
+  function reset() { setCount(null); setFile(null); setError('') }
+
+  return (
+    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-8 h-8 bg-purple-500/20 border border-purple-500/30 rounded-lg flex items-center justify-center">
+          <BookOpen size={16} className="text-purple-400" />
+        </div>
+        <div>
+          <h2 className="text-white font-bold">Redemption Menu</h2>
+          <p className="text-stone-400 text-xs">Points cost per drink — update whenever the menu changes</p>
+        </div>
+      </div>
+
+      {count === null ? (
+        <>
+          <div className="mt-4">
+            <DropZone label="Redemption Menu" description="item_code, item_name, points_required" file={file} onFile={setFile} />
+          </div>
+          {error && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-lg px-3 py-2 mt-3">
+              <AlertCircle size={13} /> {error}
+            </div>
+          )}
+          <button
+            onClick={handleProcess} disabled={processing || !file}
+            className="mt-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-40 flex items-center gap-2"
+          >
+            {processing ? <><Loader2 size={14} className="animate-spin" /> Updating menu...</> : <><Upload size={14} /> Update Menu</>}
+          </button>
+        </>
+      ) : (
+        <div className="mt-4">
+          <div className="flex items-center gap-2 text-green-400 font-semibold text-sm mb-3">
+            <CheckCircle size={16} /> Menu updated — {count} item{count !== 1 ? 's' : ''}
+          </div>
+          <button onClick={reset} className="text-sm text-stone-400 hover:text-white transition-colors">
+            Upload another →
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Transactions panel ───────────────────────────────────────────────────────
 function TransactionsPanel() {
   const [csv1, setCsv1] = useState<File | null>(null)
   const [csv2, setCsv2] = useState<File | null>(null)
-  const [redemption, setRedemption] = useState<File | null>(null)
   const [processing, setProcessing] = useState(false)
   const [summary, setSummary] = useState<UploadSummary | null>(null)
   const [error, setError] = useState('')
@@ -133,11 +197,6 @@ function TransactionsPanel() {
     if (!csv1 || !csv2) { setError('Both transaction files are required.'); return }
     setError(''); setProcessing(true)
     try {
-      if (redemption) {
-        const menuFd = new FormData()
-        menuFd.append('redemption_menu', redemption)
-        await ingestRedemptionMenu(menuFd)
-      }
       const fd = new FormData()
       fd.append('csv1', csv1)
       fd.append('csv2', csv2)
@@ -147,7 +206,7 @@ function TransactionsPanel() {
     finally { setProcessing(false) }
   }
 
-  function reset() { setSummary(null); setCsv1(null); setCsv2(null); setRedemption(null); setError('') }
+  function reset() { setSummary(null); setCsv1(null); setCsv2(null); setError('') }
 
   return (
     <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
@@ -166,7 +225,6 @@ function TransactionsPanel() {
           <div className="mt-4 space-y-3">
             <DropZone label="Transactions (CSV1)" description="Bill headers — date, mobile, outlet, net sales" file={csv1} onFile={setCsv1} />
             <DropZone label="Line Items (CSV2)" description="Drink items + modifiers per bill" file={csv2} onFile={setCsv2} />
-            <DropZone label="Redemption Menu" description="item_code, item_name, points_required — update when menu changes" file={redemption} onFile={setRedemption} optional />
           </div>
           {error && (
             <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-lg px-3 py-2 mt-3">
@@ -234,6 +292,7 @@ export function UploadWizard() {
       <div className="space-y-4">
         <CustomerPanel />
         <TransactionsPanel />
+        <RedemptionMenuPanel />
       </div>
     </div>
   )
