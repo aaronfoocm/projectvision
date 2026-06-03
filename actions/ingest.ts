@@ -8,7 +8,7 @@ import { deriveDrinkProfile } from '@/lib/ingestion/drink-profile'
 import { computeTriggers } from '@/lib/ingestion/triggers'
 import { resolveTemplate } from '@/lib/templates'
 import { createServiceClient } from '@/lib/supabase/service'
-import type { UploadSummary, Customer, JourneyLogEntry } from '@/lib/types'
+import type { UploadSummary, Customer, JourneyLogEntry, Transaction, BillItem } from '@/lib/types'
 
 const CSV1_REQUIRED = ['Date', 'Koppiku Ref #', 'Mobile #', 'Location', 'Net Sales']
 const CSV2_REQUIRED = ['Koppiku Ref #', 'Item', 'Code', 'Order Start Time', 'Item Qty']
@@ -74,8 +74,8 @@ export async function ingestCsvs(formData: FormData): Promise<UploadSummary> {
 
   const customersToUpsert: Customer[] = []
   const drinkProfilesToUpsert: Record<string, unknown>[] = []
-  const txnsToInsert: Record<string, unknown>[] = []
-  const billItemsToInsert: Record<string, unknown>[] = []
+  const txnsToInsert: Transaction[] = []
+  const billItemsToInsert: BillItem[] = []
   const segmentHistoryToInsert: Record<string, unknown>[] = []
   const journalEntriesToInsert: JourneyLogEntry[] = []
   const processedIds = new Set<string>()
