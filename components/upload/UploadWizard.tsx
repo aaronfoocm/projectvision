@@ -1,9 +1,12 @@
 'use client'
 import { useState, useRef } from 'react'
+import Papa from 'papaparse'
 import { Upload, CheckCircle, AlertCircle, Loader2, Users, Receipt, BookOpen } from 'lucide-react'
-import { ingestCustomers, ingestTransactions, ingestRedemptionMenu, getUploadUrl } from '@/actions/ingest'
+import { batchIngestCustomers, getExistingCustomerIds, ingestTransactions, ingestRedemptionMenu, getUploadUrl } from '@/actions/ingest'
 import type { UploadSummary } from '@/lib/types'
-import type { CustomerUploadResult } from '@/actions/ingest'
+import type { CustomerUploadResult, CustomerBatchRow } from '@/actions/ingest'
+
+const BATCH_SIZE = 500
 
 async function uploadToStorage(file: File): Promise<string> {
   const { signedUrl, path } = await getUploadUrl(file.name)
@@ -56,21 +59,64 @@ function DropZone({
 function CustomerPanel() {
   const [file, setFile] = useState<File | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [result, setResult] = useState<CustomerUploadResult | null>(null)
   const [error, setError] = useState('')
 
   async function handleProcess() {
     if (!file) { setError('Please upload the customer file.'); return }
-    setError(''); setProcessing(true)
+    setError(''); setProcessing(true); setProgress(0)
     try {
-      const path = await uploadToStorage(file)
-      const r = await ingestCustomers(path)
-      setResult(r)
+      const text = await file.text()
+      const parsed = Papa.parse<Record<string, string>>(text, {
+        header: true, skipEmptyLines: true,
+        transformHeader: h => h.trim(),
+        transform: v => v.trim(),
+      })
+
+      // Deduplicate by crm_id
+      const seen = new Map<string, Record<string, string>>()
+      for (const row of parsed.data) {
+        const id = row.crm_id || row.id
+        if (id) seen.set(id, row)
+      }
+      if (seen.size === 0) { setError('File appears empty or could not be parsed.'); return }
+
+      // Map to needed columns only
+      const rows: CustomerBatchRow[] = [...seen.values()].map(row => ({
+        crm_id: (row.crm_id || row.id)!,
+        mobile: (row['Mobile Number'] ?? '').replace(/^\+/, '').replace(/\s/g, '') || null,
+        first_name: row['First Name'] || null,
+        last_name: row['Last Name'] || null,
+        email: row['Email'] || null,
+        points_balance: parseFloat(row['Cashback Rewards Points']) || 0,
+        points_prev_balance: parseFloat(row['Cashback Prev Rewards Points']) || 0,
+        is_active: parseInt(row['Is Active'] ?? '1') || 1,
+        current_loc_code: row['Current Loc Code'] || null,
+      }))
+
+      // Get existing IDs for new-customer detection
+      const existingIds = new Set(await getExistingCustomerIds())
+
+      const newCustomers = rows.filter(r => !existingIds.has(r.crm_id)).length
+      const allErrors: string[] = []
+      let totalProcessed = 0
+
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE)
+        const isLast = i + BATCH_SIZE >= rows.length
+        const r = await batchIngestCustomers(batch, isLast, rows.length)
+        totalProcessed += r.processed
+        allErrors.push(...r.errors)
+        setProgress(Math.min(100, Math.round(((i + BATCH_SIZE) / rows.length) * 100)))
+      }
+
+      setResult({ totalProcessed, newCustomers, errors: allErrors })
     } catch (e) { setError(String(e)) }
     finally { setProcessing(false) }
   }
 
-  function reset() { setResult(null); setFile(null); setError('') }
+  function reset() { setResult(null); setFile(null); setError(''); setProgress(0) }
 
   return (
     <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
@@ -103,7 +149,7 @@ function CustomerPanel() {
             onClick={handleProcess} disabled={processing || !file}
             className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-40 flex items-center gap-2"
           >
-            {processing ? <><Loader2 size={14} className="animate-spin" /> Updating customers...</> : <><Upload size={14} /> Update Customer Base</>}
+            {processing ? <><Loader2 size={14} className="animate-spin" /> {progress > 0 ? `Uploading… ${progress}%` : 'Preparing…'}</> : <><Upload size={14} /> Update Customer Base</>}
           </button>
         </>
       ) : (

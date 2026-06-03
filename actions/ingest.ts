@@ -48,76 +48,60 @@ export interface CustomerUploadResult {
   errors: string[]
 }
 
-export async function ingestCustomers(storagePath: string): Promise<CustomerUploadResult> {
+export type CustomerBatchRow = {
+  crm_id: string
+  mobile: string | null
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  points_balance: number
+  points_prev_balance: number
+  is_active: number
+  current_loc_code: string | null
+}
+
+// Called once before batching to get existing IDs for new-customer detection
+export async function getExistingCustomerIds(): Promise<string[]> {
+  const supabase = createServiceClient()
+  const { data } = await supabase.from('customers').select('crm_id')
+  return (data ?? []).map(c => c.crm_id)
+}
+
+export async function batchIngestCustomers(
+  rows: CustomerBatchRow[],
+  isLast: boolean,
+  rowCount: number,
+): Promise<{ processed: number; errors: string[] }> {
+  const supabase = createServiceClient()
   const errors: string[] = []
-  const result: CustomerUploadResult = { totalProcessed: 0, newCustomers: 0, errors }
+  const today = new Date().toISOString()
 
-  try {
-    const supabase = createServiceClient()
+  const toUpsert = rows.map(r => ({
+    crm_id: r.crm_id,
+    mobile: r.mobile,
+    first_name: r.first_name,
+    last_name: r.last_name,
+    email: r.email,
+    points_balance: r.points_balance,
+    points_prev_balance: r.points_prev_balance,
+    is_active: r.is_active,
+    current_loc_code: r.current_loc_code,
+    last_updated: today,
+  }))
 
-    const text = await downloadFromStorage(supabase, storagePath)
-    const csv3 = parseCsv3(text)
-    await supabase.storage.from(BUCKET).remove([storagePath])
+  const { error } = await supabase.from('customers').upsert(toUpsert, { onConflict: 'crm_id' })
+  if (error) errors.push(`Database error: ${error.message}`)
 
-    if (csv3.length === 0) { errors.push('File appears empty or could not be parsed.'); return result }
-
-    const missing = detectMissingColumns(csv3 as unknown as Record<string, string>[], CSV3_REQUIRED)
-    if (missing.length) errors.push(`Missing columns: ${missing.join(', ')}`)
-
-    // Fetch existing to detect new customers
-    const { data: existing } = await supabase.from('customers').select('crm_id')
-    const existingIds = new Set((existing ?? []).map(c => c.crm_id))
-
-    const today = new Date().toISOString()
-
-    // Deduplicate by crm_id — keep last occurrence
-    const seen = new Map<string, typeof csv3[0]>()
-    for (const row of csv3) {
-      const id = row.crm_id || row.id
-      if (id) seen.set(id, row)
-    }
-
-    // Build upsert rows — only include columns we're updating, preserving segment/rfm
-    const customersToUpsert = [...seen.values()]
-      .map(row => {
-        const crmId = row.crm_id || row.id
-        if (!crmId) return null
-        if (!existingIds.has(crmId)) result.newCustomers++
-        return {
-          crm_id: crmId,
-          mobile: (row['Mobile Number'] ?? '').replace(/^\+/, '').replace(/\s/g, '') || null,
-          first_name: row['First Name'] || null,
-          last_name: row['Last Name'] || null,
-          email: row['Email'] || null,
-          points_balance: parseFloat(row['Cashback Rewards Points']) || 0,
-          points_prev_balance: parseFloat(row['Cashback Prev Rewards Points']) || 0,
-          current_loc_code: row['Current Loc Code'] || null,
-          is_active: parseInt(row['Is Active'] ?? '1') || 1,
-          last_updated: today,
-        }
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null)
-
-    if (customersToUpsert.length) {
-      const { error } = await supabase
-        .from('customers')
-        .upsert(customersToUpsert, { onConflict: 'crm_id' })
-      if (error) errors.push(`Database error: ${error.message}`)
-    }
-
+  if (isLast) {
     await supabase.from('upload_log').insert([{
       file_type: 'customers',
-      row_count: csv3.length,
+      row_count: rowCount,
       status: errors.length ? 'partial' : 'success',
       error_message: errors[0] ?? null,
     }])
-
-    result.totalProcessed = customersToUpsert.length
-  } catch (e) {
-    errors.push(`Unexpected error: ${e instanceof Error ? e.message : String(e)}`)
   }
 
-  return result
+  return { processed: rows.length, errors }
 }
 
 // ─── CSV1 + CSV2: Daily transaction pair ─────────────────────────────────────
