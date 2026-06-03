@@ -2,15 +2,20 @@
 import { useState, useRef } from 'react'
 import { Upload, CheckCircle, AlertCircle, Loader2, Users, Receipt, BookOpen } from 'lucide-react'
 import { ingestCustomers, ingestTransactions, ingestRedemptionMenu, getUploadUrl } from '@/actions/ingest'
-import { createClient } from '@/lib/supabase/client'
 import type { UploadSummary } from '@/lib/types'
 import type { CustomerUploadResult } from '@/actions/ingest'
 
 async function uploadToStorage(file: File): Promise<string> {
-  const { token, path } = await getUploadUrl(file.name)
-  const supabase = createClient()
-  const { error } = await supabase.storage.from('csv-uploads').uploadToSignedUrl(path, token, file)
-  if (error) throw new Error(`Upload failed: ${error.message}`)
+  const { signedUrl, path } = await getUploadUrl(file.name)
+  const res = await fetch(signedUrl, {
+    method: 'PUT',
+    body: file,
+    headers: { 'x-upsert': 'true' },
+  })
+  if (!res.ok) {
+    const msg = await res.text().catch(() => res.statusText)
+    throw new Error(`Storage upload failed (${res.status}): ${msg}`)
+  }
   return path
 }
 
