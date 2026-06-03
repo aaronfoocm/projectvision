@@ -67,8 +67,15 @@ export async function ingestCustomers(storagePath: string): Promise<CustomerUplo
 
     const today = new Date().toISOString()
 
+    // Deduplicate by crm_id — keep last occurrence
+    const seen = new Map<string, typeof csv3[0]>()
+    for (const row of csv3) {
+      const id = row.crm_id || row.id
+      if (id) seen.set(id, row)
+    }
+
     // Build upsert rows — only include columns we're updating, preserving segment/rfm
-    const customersToUpsert = csv3
+    const customersToUpsert = [...seen.values()]
       .map(row => {
         const crmId = row.crm_id || row.id
         if (!crmId) return null
