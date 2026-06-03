@@ -17,7 +17,7 @@ const CSV2_REQUIRED = ['Koppiku Ref #', 'Item', 'Code', 'Order Start Time', 'Ite
 const CSV3_REQUIRED = ['crm_id', 'Mobile Number', 'Cashback Rewards Points']
 
 // ─── Signed upload URL ────────────────────────────────────────────────────────
-export async function getUploadUrl(filename: string): Promise<{ signedUrl: string; path: string }> {
+export async function getUploadUrl(filename: string): Promise<{ signedUrl: string; token: string; path: string }> {
   const supabase = createServiceClient()
   const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${Date.now()}-${safe}`
@@ -32,7 +32,7 @@ export async function getUploadUrl(filename: string): Promise<{ signedUrl: strin
 
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
   if (error || !data) throw new Error(`Could not create upload URL: ${error?.message}`)
-  return { signedUrl: data.signedUrl, path: data.path }
+  return { signedUrl: data.signedUrl, token: data.token, path: data.path }
 }
 
 async function downloadFromStorage(supabase: ReturnType<typeof createServiceClient>, path: string): Promise<string> {

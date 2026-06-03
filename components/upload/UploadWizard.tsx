@@ -6,8 +6,9 @@ import type { UploadSummary } from '@/lib/types'
 import type { CustomerUploadResult } from '@/actions/ingest'
 
 async function uploadToStorage(file: File): Promise<string> {
-  const { signedUrl, path } = await getUploadUrl(file.name)
-  const res = await fetch(signedUrl, {
+  const { signedUrl, token, path } = await getUploadUrl(file.name)
+  const url = `${signedUrl}?token=${token}`
+  const res = await fetch(url, {
     method: 'PUT',
     body: file,
     headers: { 'x-upsert': 'true' },
