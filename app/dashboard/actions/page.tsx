@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { ActionRow } from '@/components/actions/ActionRow'
+import { ActionBatch } from '@/components/actions/ActionBatch'
 
 interface ActionCustomer {
   crm_id: string
@@ -20,7 +20,6 @@ interface ActionRecord {
 
 export default async function ActionsPage() {
   const supabase = await createClient()
-  const today = new Date().toISOString().slice(0, 10)
 
   const { data: rawActions } = await supabase
     .from('journey_log')
@@ -33,67 +32,51 @@ export default async function ActionsPage() {
 
   const actions = (rawActions ?? []) as unknown as ActionRecord[]
 
-  const todayActions = actions.filter(a => a.action_date === today)
-  const overdueActions = actions.filter(a => a.action_date < today)
-
-  function customerName(a: ActionRecord) {
-    return [a.customers?.first_name, a.customers?.last_name].filter(Boolean).join(' ') || 'Unknown'
+  // Group by message_template
+  const batchMap = new Map<string, ActionRecord[]>()
+  for (const a of actions) {
+    const arr = batchMap.get(a.message_template) ?? []
+    arr.push(a)
+    batchMap.set(a.message_template, arr)
   }
 
-  function customerSegment(a: ActionRecord) {
-    return a.customers?.segment ?? ''
-  }
+  const batches = [...batchMap.entries()]
+    .map(([template, records]) => ({
+      template,
+      actionType: records[0].action_type,
+      channel: records[0].channel,
+      sampleMessage: records[0].resolved_message,
+      actions: records,
+    }))
+    .sort((a, b) => b.actions.length - a.actions.length)
 
   return (
     <div className="p-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-white text-2xl font-bold">Daily Actions</h1>
-          <p className="text-stone-400 text-sm mt-0.5">
-            {todayActions.length} today · {overdueActions.length} overdue
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-white text-2xl font-bold">Daily Actions</h1>
+        <p className="text-stone-400 text-sm mt-0.5">
+          {actions.length} pending · {batches.length} batch{batches.length !== 1 ? 'es' : ''} · Download each batch to send via WhatsApp
+        </p>
       </div>
 
-      {overdueActions.length > 0 && (
-        <div className="mb-6">
-          <p className="text-xs text-orange-400 font-semibold uppercase mb-2">⏰ Overdue from previous days</p>
-          {overdueActions.map(a => (
-            <ActionRow
-              key={a.id}
-              id={a.id}
-              customerName={customerName(a)}
-              segment={customerSegment(a)}
-              channel={a.channel}
-              template={a.message_template}
-              resolvedMessage={a.resolved_message}
-              isOverdue={true}
-            />
-          ))}
-        </div>
-      )}
-
-      {todayActions.length > 0 ? (
-        <div>
-          <p className="text-xs text-stone-500 font-semibold uppercase mb-2">Today</p>
-          {todayActions.map(a => (
-            <ActionRow
-              key={a.id}
-              id={a.id}
-              customerName={customerName(a)}
-              segment={customerSegment(a)}
-              channel={a.channel}
-              template={a.message_template}
-              resolvedMessage={a.resolved_message}
-              isOverdue={false}
-            />
-          ))}
-        </div>
-      ) : (
+      {batches.length === 0 ? (
         <div className="text-center py-16 text-stone-500">
           <p className="text-4xl mb-3">✅</p>
           <p className="font-semibold text-white">All caught up!</p>
-          <p className="text-sm mt-1">No pending actions for today.</p>
+          <p className="text-sm mt-1">No pending actions.</p>
+        </div>
+      ) : (
+        <div>
+          {batches.map(b => (
+            <ActionBatch
+              key={b.template}
+              template={b.template}
+              actionType={b.actionType}
+              channel={b.channel}
+              sampleMessage={b.sampleMessage}
+              actions={b.actions}
+            />
+          ))}
         </div>
       )}
     </div>
