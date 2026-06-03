@@ -1,9 +1,18 @@
 'use client'
 import { useState, useRef } from 'react'
 import { Upload, CheckCircle, AlertCircle, Loader2, Users, Receipt, BookOpen } from 'lucide-react'
-import { ingestCustomers, ingestTransactions, ingestRedemptionMenu } from '@/actions/ingest'
+import { ingestCustomers, ingestTransactions, ingestRedemptionMenu, getUploadUrl } from '@/actions/ingest'
+import { createClient } from '@/lib/supabase/client'
 import type { UploadSummary } from '@/lib/types'
 import type { CustomerUploadResult } from '@/actions/ingest'
+
+async function uploadToStorage(file: File): Promise<string> {
+  const { token, path } = await getUploadUrl(file.name)
+  const supabase = createClient()
+  const { error } = await supabase.storage.from('csv-uploads').uploadToSignedUrl(path, token, file)
+  if (error) throw new Error(`Upload failed: ${error.message}`)
+  return path
+}
 
 // ─── Drop zone ────────────────────────────────────────────────────────────────
 function DropZone({
@@ -49,9 +58,8 @@ function CustomerPanel() {
     if (!file) { setError('Please upload the customer file.'); return }
     setError(''); setProcessing(true)
     try {
-      const fd = new FormData()
-      fd.append('csv3', file)
-      const r = await ingestCustomers(fd)
+      const path = await uploadToStorage(file)
+      const r = await ingestCustomers(path)
       setResult(r)
     } catch (e) { setError(String(e)) }
     finally { setProcessing(false) }
@@ -131,9 +139,8 @@ function RedemptionMenuPanel() {
     if (!file) { setError('Please upload the redemption menu file.'); return }
     setError(''); setProcessing(true)
     try {
-      const fd = new FormData()
-      fd.append('redemption_menu', file)
-      const r = await ingestRedemptionMenu(fd)
+      const path = await uploadToStorage(file)
+      const r = await ingestRedemptionMenu(path)
       if (r.error) setError(r.error)
       else setCount(r.count)
     } catch (e) { setError(String(e)) }
@@ -197,10 +204,8 @@ function TransactionsPanel() {
     if (!csv1 || !csv2) { setError('Both transaction files are required.'); return }
     setError(''); setProcessing(true)
     try {
-      const fd = new FormData()
-      fd.append('csv1', csv1)
-      fd.append('csv2', csv2)
-      const r = await ingestTransactions(fd)
+      const [path1, path2] = await Promise.all([uploadToStorage(csv1), uploadToStorage(csv2)])
+      const r = await ingestTransactions(path1, path2)
       setSummary(r)
     } catch (e) { setError(String(e)) }
     finally { setProcessing(false) }

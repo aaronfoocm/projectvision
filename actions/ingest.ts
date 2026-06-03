@@ -10,9 +10,33 @@ import { resolveTemplate } from '@/lib/templates'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { UploadSummary, Customer, JourneyLogEntry } from '@/lib/types'
 
+const BUCKET = 'csv-uploads'
+
 const CSV1_REQUIRED = ['Date', 'Koppiku Ref #', 'Mobile #', 'Location', 'Net Sales']
 const CSV2_REQUIRED = ['Koppiku Ref #', 'Item', 'Code', 'Order Start Time', 'Item Qty']
 const CSV3_REQUIRED = ['crm_id', 'Mobile Number', 'Cashback Rewards Points']
+
+// ─── Signed upload URL ────────────────────────────────────────────────────────
+export async function getUploadUrl(filename: string): Promise<{ token: string; path: string }> {
+  const supabase = createServiceClient()
+  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${Date.now()}-${safe}`
+
+  const { data: bucket } = await supabase.storage.getBucket(BUCKET)
+  if (!bucket) {
+    await supabase.storage.createBucket(BUCKET, { public: false })
+  }
+
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
+  if (error || !data) throw new Error(`Could not create upload URL: ${error?.message}`)
+  return { token: data.token, path: data.path }
+}
+
+async function downloadFromStorage(supabase: ReturnType<typeof createServiceClient>, path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(path)
+  if (error || !data) throw new Error(`Could not download file: ${error?.message}`)
+  return data.text()
+}
 
 // ─── CSV3: Customer master file ───────────────────────────────────────────────
 export interface CustomerUploadResult {
@@ -21,18 +45,16 @@ export interface CustomerUploadResult {
   errors: string[]
 }
 
-export async function ingestCustomers(formData: FormData): Promise<CustomerUploadResult> {
+export async function ingestCustomers(storagePath: string): Promise<CustomerUploadResult> {
   const errors: string[] = []
   const result: CustomerUploadResult = { totalProcessed: 0, newCustomers: 0, errors }
 
   try {
     const supabase = createServiceClient()
 
-    const file = formData.get('csv3') as File | null
-    if (!file) { errors.push('Customer file is required.'); return result }
-
-    const text = await file.text()
+    const text = await downloadFromStorage(supabase, storagePath)
     const csv3 = parseCsv3(text)
+    await supabase.storage.from(BUCKET).remove([storagePath])
 
     if (csv3.length === 0) { errors.push('File appears empty or could not be parsed.'); return result }
 
@@ -89,17 +111,17 @@ export async function ingestCustomers(formData: FormData): Promise<CustomerUploa
 }
 
 // ─── CSV1 + CSV2: Daily transaction pair ─────────────────────────────────────
-export async function ingestTransactions(formData: FormData): Promise<UploadSummary> {
+export async function ingestTransactions(storagePath1: string, storagePath2: string): Promise<UploadSummary> {
   const supabase = createServiceClient()
   const today = new Date()
   const errors: string[] = []
   const summary: UploadSummary = { totalProcessed: 0, newCustomers: 0, segmentChanges: [], actionsGenerated: 0, errors }
 
-  const file1 = formData.get('csv1') as File | null
-  const file2 = formData.get('csv2') as File | null
-  if (!file1 || !file2) { errors.push('Both transaction and line item files are required.'); return summary }
-
-  const [text1, text2] = await Promise.all([file1.text(), file2.text()])
+  const [text1, text2] = await Promise.all([
+    downloadFromStorage(supabase, storagePath1),
+    downloadFromStorage(supabase, storagePath2),
+  ])
+  await supabase.storage.from(BUCKET).remove([storagePath1, storagePath2])
   const csv1 = parseCsv1(text1)
   const csv2 = parseCsv2(text2)
 
@@ -376,12 +398,11 @@ export async function ingestTransactions(formData: FormData): Promise<UploadSumm
   return summary
 }
 
-// ─── Redemption menu (unchanged) ─────────────────────────────────────────────
-export async function ingestRedemptionMenu(formData: FormData): Promise<{ count: number; error?: string }> {
+// ─── Redemption menu ──────────────────────────────────────────────────────────
+export async function ingestRedemptionMenu(storagePath: string): Promise<{ count: number; error?: string }> {
   const supabase = createServiceClient()
-  const file = formData.get('redemption_menu') as File | null
-  if (!file) return { count: 0, error: 'No file provided' }
-  const text = await file.text()
+  const text = await downloadFromStorage(supabase, storagePath)
+  await supabase.storage.from(BUCKET).remove([storagePath])
   const { parseCsv1 } = await import('@/lib/ingestion/parse')
   const rows = parseCsv1(text) as unknown as Array<{ item_code: string; item_name: string; points_required: string }>
   const items = rows.map(r => ({ item_code: r.item_code, item_name: r.item_name, points_required: parseInt(r.points_required) || 0 }))
