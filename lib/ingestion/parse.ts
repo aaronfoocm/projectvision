@@ -1,10 +1,17 @@
 import Papa from 'papaparse'
 import type { Csv1Row, Csv2Row, Csv3Row } from '@/lib/types'
 
+function detectDelimiter(content: string): string {
+  const firstLine = content.split('\n')[0]
+  const tabs = (firstLine.match(/\t/g) ?? []).length
+  const commas = (firstLine.match(/,/g) ?? []).length
+  return tabs >= commas ? '\t' : ','
+}
+
 function parseTsv<T>(content: string, skipEmpty: boolean, trimValues = true): T[] {
   const result = Papa.parse<T>(content, {
     header: true,
-    delimiter: '\t',
+    delimiter: detectDelimiter(content),
     skipEmptyLines: skipEmpty ? true : false,
     transformHeader: (h) => h.trim(),
     transform: trimValues ? (v) => v.trim() : undefined,
