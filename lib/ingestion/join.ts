@@ -8,8 +8,13 @@ export interface JoinedData {
   unknownTransactions: Transaction[]
 }
 
+// Canonical format: 60XXXXXXXXX (Malaysian international, no + prefix)
 function normaliseMobile(raw: string): string {
-  return raw.replace(/^\+/, '').replace(/\s/g, '')
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('60')) return digits
+  if (digits.startsWith('0')) return '60' + digits.slice(1)
+  return '60' + digits
 }
 
 export function joinCsvs(csv1: Csv1Row[], csv2: Csv2Row[], csv3: Csv3Row[]): JoinedData {

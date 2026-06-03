@@ -8,6 +8,14 @@ import type { CustomerUploadResult, CustomerBatchRow } from '@/actions/ingest'
 
 const BATCH_SIZE = 500
 
+function normaliseMY(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('60')) return digits
+  if (digits.startsWith('0')) return '60' + digits.slice(1)
+  return '60' + digits
+}
+
 async function uploadToStorage(file: File): Promise<string> {
   const { signedUrl, path } = await getUploadUrl(file.name)
   const res = await fetch(signedUrl, {
@@ -85,7 +93,7 @@ function CustomerPanel() {
       // Map to needed columns only
       const rows: CustomerBatchRow[] = [...seen.values()].map(row => ({
         crm_id: (row.crm_id || row.id)!,
-        mobile: (row['Mobile Number'] ?? '').replace(/^\+/, '').replace(/\s/g, '') || null,
+        mobile: normaliseMY(row['Mobile Number'] ?? '') || null,
         first_name: row['First Name'] || null,
         last_name: row['Last Name'] || null,
         email: row['Email'] || null,

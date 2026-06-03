@@ -10,6 +10,15 @@ import { resolveTemplate } from '@/lib/templates'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { UploadSummary, Customer, JourneyLogEntry } from '@/lib/types'
 
+// Canonical Malaysian mobile format: 60XXXXXXXXX (no + prefix)
+function normaliseMY(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('60')) return digits
+  if (digits.startsWith('0')) return '60' + digits.slice(1)
+  return '60' + digits
+}
+
 const BUCKET = 'csv-uploads'
 
 const CSV1_REQUIRED = ['Date', 'Koppiku Ref #', 'Mobile #', 'Location', 'Net Sales']
@@ -125,7 +134,7 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
   // ── Resolve customer identity from DB (not from CSV3) ──────────────────────
   // Get all unique mobiles from CSV1
   const mobiles = [...new Set(
-    csv1.map(r => (r['Mobile #'] || '').replace(/^\+/, '').replace(/\s/g, '')).filter(Boolean)
+    csv1.map(r => normaliseMY(r['Mobile #'] || '')).filter(Boolean)
   )]
 
   // Lookup customers by mobile
