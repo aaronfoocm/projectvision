@@ -1,15 +1,15 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { LayoutDashboard, Zap, Users, Upload, Coffee, DatabaseZap, PieChart } from 'lucide-react'
+import { Coffee } from 'lucide-react'
 import { NavLink } from '@/components/layout/NavLink'
 
 const nav = [
-  { href: '/dashboard',          label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/actions',  label: 'Actions',   icon: Zap },
-  { href: '/dashboard/segments', label: 'Segments',  icon: PieChart },
-  { href: '/dashboard/customers',label: 'Customers', icon: Users },
-  { href: '/dashboard/upload',   label: 'Upload',    icon: Upload },
-  { href: '/dashboard/database', label: 'Database',  icon: DatabaseZap },
+  { href: '/dashboard',          label: 'Dashboard' },
+  { href: '/dashboard/actions',  label: 'Actions'   },
+  { href: '/dashboard/segments', label: 'Segments'  },
+  { href: '/dashboard/customers',label: 'Customers' },
+  { href: '/dashboard/upload',   label: 'Upload'    },
+  { href: '/dashboard/database', label: 'Database'  },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -32,8 +32,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {nav.map(item => (
-            <NavLink key={item.href} {...item} />
+          {nav.map(({ href, label }) => (
+            <NavLink key={href} href={href} label={label} />
           ))}
         </nav>
         <div className="px-4 py-4 border-t border-stone-800">

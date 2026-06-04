@@ -1,17 +1,26 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Zap, Users, Upload, DatabaseZap, PieChart, LucideIcon } from 'lucide-react'
+
+const ICONS: Record<string, LucideIcon> = {
+  '/dashboard':          LayoutDashboard,
+  '/dashboard/actions':  Zap,
+  '/dashboard/segments': PieChart,
+  '/dashboard/customers':Users,
+  '/dashboard/upload':   Upload,
+  '/dashboard/database': DatabaseZap,
+}
 
 interface Props {
   href: string
   label: string
-  icon: LucideIcon
 }
 
-export function NavLink({ href, label, icon: Icon }: Props) {
+export function NavLink({ href, label }: Props) {
   const pathname = usePathname()
   const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+  const Icon = ICONS[href]
 
   return (
     <Link
@@ -22,7 +31,7 @@ export function NavLink({ href, label, icon: Icon }: Props) {
           : 'text-stone-400 hover:bg-stone-800 hover:text-stone-100 font-normal border border-transparent'
       }`}
     >
-      <Icon size={16} className={isActive ? 'text-amber-400' : 'text-stone-500'} />
+      {Icon && <Icon size={16} className={isActive ? 'text-amber-400' : 'text-stone-500'} />}
       {label}
     </Link>
   )
