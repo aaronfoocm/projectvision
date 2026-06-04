@@ -4,12 +4,12 @@ import './globals.css'
 
 const geistSans = Geist({
   subsets: ['latin'],
-  variable: '--font-sans',
+  variable: '--font-geist-sans',
 })
 
 const geistMono = Geist_Mono({
   subsets: ['latin'],
-  variable: '--font-mono',
+  variable: '--font-geist-mono',
 })
 
 export const metadata: Metadata = {
