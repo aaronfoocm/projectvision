@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     return redirect
   }
   if (user && request.nextUrl.pathname === '/login') {
-    const redirect = NextResponse.redirect(new URL('/dashboard', request.url))
+    const redirect = NextResponse.redirect(new URL('/dashboard/segments', request.url))
     request.cookies.getAll().forEach(c => redirect.cookies.set(c.name, c.value))
     return redirect
   }

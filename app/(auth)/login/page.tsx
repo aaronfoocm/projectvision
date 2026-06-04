@@ -23,7 +23,7 @@ export default function LoginPage() {
       return
     }
     router.refresh()
-    router.push('/dashboard')
+    router.push('/dashboard/segments')
   }
 
   return (
