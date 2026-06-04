@@ -61,18 +61,16 @@ export default async function DatabasePage({
   const windowStart = new Date(windowEnd)
   windowStart.setDate(windowStart.getDate() - 364)
 
+  const weeks = buildWeeks(windowEnd)
+
+  // Parallel fetches: stats + one count-only query per week (bypasses 1000-row cap)
   const [
-    { data: txnDates },
     { count: totalCustomers },
     { count: totalTransactions },
     { data: uploadLog },
     { data: dateRange },
+    ...weekCounts
   ] = await Promise.all([
-    supabase
-      .from('transactions')
-      .select('transaction_date')
-      .gte('transaction_date', windowStart.toISOString().slice(0, 10))
-      .lte('transaction_date', windowEnd.toISOString().slice(0, 10)),
     supabase.from('customers').select('*', { count: 'exact', head: true }),
     supabase.from('transactions').select('*', { count: 'exact', head: true }),
     supabase
@@ -86,18 +84,24 @@ export default async function DatabasePage({
       .not('transaction_date', 'is', null)
       .order('transaction_date', { ascending: false })
       .limit(1),
+    // One count query per week — returns a number, never hits the row cap
+    ...weeks.map(week =>
+      supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .gte('transaction_date', week[0].iso)
+        .lte('transaction_date', week[6].iso)
+    ),
   ])
 
-  // Count transactions per calendar date
+  // Map each week's count to every day in that week
   const countByDate = new Map<string, number>()
-  for (const t of txnDates ?? []) {
-    if (!t.transaction_date) continue
-    const iso = String(t.transaction_date).slice(0, 10)
-    countByDate.set(iso, (countByDate.get(iso) ?? 0) + 1)
-  }
+  weeks.forEach((week, i) => {
+    const c = (weekCounts[i] as { count: number | null }).count ?? 0
+    if (c > 0) week.forEach(({ iso }) => countByDate.set(iso, c))
+  })
 
   const maxCount = Math.max(0, ...countByDate.values())
-  const weeks = buildWeeks(windowEnd)
 
   const lastTxnDate = dateRange?.[0]?.transaction_date
     ? String(dateRange[0].transaction_date).slice(0, 10)
