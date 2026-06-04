@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { LayoutDashboard, Zap, Users, Upload, Coffee, DatabaseZap } from 'lucide-react'
+import { LayoutDashboard, Zap, Users, Upload, Coffee, DatabaseZap, PieChart } from 'lucide-react'
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/actions', label: 'Actions', icon: Zap },
+  { href: '/dashboard/segments', label: 'Segments', icon: PieChart },
   { href: '/dashboard/customers', label: 'Customers', icon: Users },
   { href: '/dashboard/upload', label: 'Upload', icon: Upload },
   { href: '/dashboard/database', label: 'Database', icon: DatabaseZap },
