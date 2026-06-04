@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { SegmentCard } from '@/components/dashboard/SegmentCard'
@@ -33,13 +35,21 @@ export default async function DashboardPage({
     .from('customers')
     .select('crm_id, segment, rfm_r, rfm_f, rfm_m, first_name, last_name')
     .eq('is_active', 1)
+    .not('segment', 'is', null)
   if (filteredIds !== null) customersQuery = customersQuery.in('crm_id', filteredIds)
-  const { data: customers } = await customersQuery
 
-  const counts = Object.fromEntries(ALL_SEGMENTS.map(s => [s, 0])) as Record<Segment, number>
-  for (const c of customers ?? []) {
-    if (c.segment && c.segment in counts) counts[c.segment as Segment]++
-  }
+  // Segment counts: one count-per-segment query to bypass the 1000-row cap
+  const segCountQueries = ALL_SEGMENTS.map(seg => {
+    let q = supabase.from('customers').select('*', { count: 'exact', head: true }).eq('segment', seg).eq('is_active', 1)
+    if (filteredIds !== null) q = q.in('crm_id', filteredIds)
+    return q
+  })
+
+  const [{ data: customers }, ...segResults] = await Promise.all([customersQuery, ...segCountQueries])
+
+  const counts = Object.fromEntries(
+    ALL_SEGMENTS.map((seg, i) => [seg, segResults[i].count ?? 0])
+  ) as Record<Segment, number>
 
   const { data: drinkProfiles } = await supabase
     .from('drink_profiles')
