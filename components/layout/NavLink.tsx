@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Zap, Users, Upload, DatabaseZap, PieChart, LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Zap, Users, Upload, DatabaseZap, PieChart, BookOpen, LucideIcon } from 'lucide-react'
 
 const ICONS: Record<string, LucideIcon> = {
   '/dashboard':          LayoutDashboard,
@@ -10,6 +10,7 @@ const ICONS: Record<string, LucideIcon> = {
   '/dashboard/customers':Users,
   '/dashboard/upload':   Upload,
   '/dashboard/database': DatabaseZap,
+  '/dashboard/guide':    BookOpen,
 }
 
 interface Props {

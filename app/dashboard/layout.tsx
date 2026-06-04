@@ -10,6 +10,7 @@ const nav = [
   { href: '/dashboard/customers',label: 'Customers' },
   { href: '/dashboard/upload',   label: 'Upload'    },
   { href: '/dashboard/database', label: 'Database'  },
+  { href: '/dashboard/guide',    label: 'Guide'     },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
