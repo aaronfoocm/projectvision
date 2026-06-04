@@ -43,10 +43,12 @@ export function deriveDrinkProfile(items: BillItem[]): ComputedDrinkProfile {
   const slots = parents.filter(p => p.order_start_time).map(p => getTimeSlot(p.order_start_time!))
   const preferred_time_slot = mostFrequent(slots)
 
-  const milks = modifiers.filter(m => MILK_KEYWORDS.some(k => m.modifier_name?.toLowerCase().includes(k))).map(m => m.modifier_name!)
+  const cleanName = (s: string | null | undefined) => s?.replace(/^\s*-\s*/, '').trim() ?? null
+
+  const milks = modifiers.filter(m => MILK_KEYWORDS.some(k => m.modifier_name?.toLowerCase().includes(k))).map(m => cleanName(m.modifier_name)!)
   const preferred_milk = mostFrequent(milks)
 
-  const sizes = modifiers.filter(m => SIZE_KEYWORDS.some(k => m.modifier_name?.toLowerCase().includes(k))).map(m => m.modifier_name!)
+  const sizes = modifiers.filter(m => SIZE_KEYWORDS.some(k => m.modifier_name?.toLowerCase().includes(k))).map(m => cleanName(m.modifier_name)!)
   const preferred_size = mostFrequent(sizes)
 
   const favourite_drink = mostFrequent(parents.map(p => p.item_name).filter(Boolean) as string[])
@@ -56,7 +58,10 @@ export function deriveDrinkProfile(items: BillItem[]): ComputedDrinkProfile {
     return !MILK_KEYWORDS.some(k => name.includes(k)) && !SIZE_KEYWORDS.includes(name)
   })
   const otherCounts = new Map<string, number>()
-  for (const m of others) otherCounts.set(m.modifier_name!, (otherCounts.get(m.modifier_name!) ?? 0) + 1)
+  for (const m of others) {
+    const n = cleanName(m.modifier_name)
+    if (n) otherCounts.set(n, (otherCounts.get(n) ?? 0) + 1)
+  }
   const top2 = [...otherCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0])
 
   return { favourite_drink, preferred_temp, preferred_time_slot, preferred_milk, preferred_size, top_modifier_1: top2[0] ?? null, top_modifier_2: top2[1] ?? null }

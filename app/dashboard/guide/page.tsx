@@ -3,20 +3,38 @@ import { SEGMENT_META, ALL_SEGMENTS } from '@/lib/segment-meta'
 const RFM_DIMS = [
   {
     letter: 'R', name: 'Recency', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20',
-    what: 'Days since last visit, scored 1–5.',
-    how: 'Score 5 = visited very recently. Score 1 = hasn\'t visited in a long time.',
+    what: 'Days since last visit, scored 1–5 across all customers as quintiles.',
+    bands: [
+      { score: 5, label: 'Visited within 63 days',      pct: 'Top 20%' },
+      { score: 4, label: '63 – 288 days ago',            pct: '' },
+      { score: 3, label: '288 – 364 days ago',           pct: '' },
+      { score: 2, label: '364 – 401 days ago',           pct: '' },
+      { score: 1, label: '401+ days ago',                pct: 'Bottom 20%' },
+    ],
     action: 'Low R customers are drifting — send a win-back offer before they disappear.',
   },
   {
     letter: 'F', name: 'Frequency', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20',
-    what: 'Number of visits in the last 90 days, scored 1–5.',
-    how: 'Score 5 = most frequent visitors. Score 1 = rarely visits.',
+    what: 'Total visits on record, scored 1–5 as quintiles across all customers.',
+    bands: [
+      { score: 5, label: '9+ visits',   pct: 'Top 20%' },
+      { score: 4, label: '3 – 9 visits', pct: '' },
+      { score: 3, label: '1 – 3 visits', pct: '' },
+      { score: 2, label: '1 visit',      pct: '' },
+      { score: 1, label: '1 visit',      pct: 'Bottom 20% — single visit' },
+    ],
     action: 'High F customers are habitual — reward them before a competitor does.',
   },
   {
     letter: 'M', name: 'Monetary', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20',
-    what: 'Average spend per visit, scored 1–5.',
-    how: 'Score 5 = highest spenders. Score 1 = lowest average ticket.',
+    what: 'Average spend per visit (net sales ÷ visits), scored 1–5 as quintiles.',
+    bands: [
+      { score: 5, label: 'Highest average ticket', pct: 'Top 20% spenders' },
+      { score: 4, label: 'Above-average spend',    pct: '' },
+      { score: 3, label: 'Mid-range spend',        pct: '' },
+      { score: 2, label: 'Below-average spend',    pct: '' },
+      { score: 1, label: 'Lowest average ticket',  pct: 'Bottom 20% spenders' },
+    ],
     action: 'High M + low F = high-value but irregular — a loyalty nudge can lock them in.',
   },
 ]
@@ -87,15 +105,23 @@ export default function GuidePage() {
           more recoverable than one with R=1.
         </p>
         <div className="grid grid-cols-3 gap-3 mb-4">
-          {RFM_DIMS.map(({ letter, name, color, bg, what, how, action }) => (
+          {RFM_DIMS.map(({ letter, name, color, bg, what, bands, action }) => (
             <div key={letter} className={`border rounded-xl p-4 ${bg}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className={`text-2xl font-black font-mono ${color}`}>{letter}</span>
                 <span className={`text-sm font-semibold ${color}`}>{name}</span>
               </div>
-              <p className="text-stone-400 text-xs leading-relaxed mb-1">{what}</p>
-              <p className="text-stone-500 text-xs leading-relaxed mb-2">{how}</p>
-              <p className={`text-xs font-medium ${color} leading-relaxed`}>{action}</p>
+              <p className="text-stone-400 text-xs leading-relaxed mb-3">{what}</p>
+              <div className="space-y-1 mb-3">
+                {bands.map(({ score, label, pct }) => (
+                  <div key={score} className="flex items-center gap-2">
+                    <span className={`text-xs font-black font-mono w-3 ${color}`}>{score}</span>
+                    <span className="text-stone-400 text-xs flex-1">{label}</span>
+                    {pct && <span className="text-stone-600 text-[10px]">{pct}</span>}
+                  </div>
+                ))}
+              </div>
+              <p className={`text-xs font-medium ${color} leading-relaxed border-t border-white/5 pt-2`}>{action}</p>
             </div>
           ))}
         </div>

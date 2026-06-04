@@ -38,14 +38,24 @@ export default async function SegmentsPage({
 
   const supabase = await createClient()
 
-  // If time filter active, resolve customer IDs that match preferred_time_slot
+  // If time filter active, paginate drink_profiles to avoid the 1000-row PostgREST cap
   let timeFilteredIds: string[] | null = null
   if (timeFilter) {
-    const { data } = await supabase
-      .from('drink_profiles')
-      .select('customer_id')
-      .eq('preferred_time_slot', timeFilter)
-    timeFilteredIds = (data ?? []).map(r => r.customer_id)
+    const ids: string[] = []
+    const PAGE = 1000
+    let from = 0
+    while (true) {
+      const { data } = await supabase
+        .from('drink_profiles')
+        .select('customer_id')
+        .eq('preferred_time_slot', timeFilter)
+        .range(from, from + PAGE - 1)
+      if (!data || data.length === 0) break
+      ids.push(...data.map(r => r.customer_id))
+      if (data.length < PAGE) break
+      from += PAGE
+    }
+    timeFilteredIds = ids
   }
 
   // Segment counts

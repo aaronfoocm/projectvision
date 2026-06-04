@@ -13,13 +13,17 @@ interface Props {
   preferred_size?: string | null
 }
 
+function clean(s: string | null | undefined): string | null {
+  return s ? s.replace(/^\s*-\s*/, '').trim() || null : null
+}
+
 export function DrinkDNA({ preferred_temp, preferred_time_slot, preferred_milk, favourite_drink, preferred_size }: Props) {
   const tags = [
     preferred_temp && TEMP_LABELS[preferred_temp],
     preferred_time_slot && TIME_LABELS[preferred_time_slot],
-    preferred_milk && `🥛 ${preferred_milk}`,
-    preferred_size && `📏 ${preferred_size}`,
-    favourite_drink && `☕ ${favourite_drink}`,
+    clean(preferred_milk) && `🥛 ${clean(preferred_milk)}`,
+    clean(preferred_size) && `📏 ${clean(preferred_size)}`,
+    clean(favourite_drink) && `☕ ${clean(favourite_drink)}`,
   ].filter(Boolean) as string[]
 
   if (!tags.length) return <span className="text-xs text-stone-600">No drink data yet</span>
