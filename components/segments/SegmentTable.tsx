@@ -9,6 +9,9 @@ interface Customer {
   last_name: string | null
   mobile: string | null
   segment: string | null
+  rfm_r: number | null
+  rfm_f: number | null
+  rfm_m: number | null
   total_visits: number | null
   last_visit_date: string | null
   avg_gap_days: number | null
@@ -42,15 +45,18 @@ interface Props {
   customers: Customer[]
   total: number
   segment: string
+  rfmR: number[]
+  rfmF: number[]
+  rfmM: number[]
 }
 
-export function SegmentTable({ customers, total, segment }: Props) {
+export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Props) {
   const [exporting, setExporting] = useState(false)
 
   async function handleExport() {
     setExporting(true)
     try {
-      const csv = await exportSegmentCSV(segment)
+      const csv = await exportSegmentCSV(segment, rfmR, rfmF, rfmM)
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -100,6 +106,7 @@ export function SegmentTable({ customers, total, segment }: Props) {
                 <th className="text-right px-4 py-3 font-medium">Last Visit</th>
                 <th className="text-right px-4 py-3 font-medium">Avg Gap</th>
                 <th className="text-right px-4 py-3 font-medium">Points</th>
+                <th className="text-right px-4 py-3 font-medium">RFM</th>
                 <th className="text-left px-4 py-3 font-medium">Fav Drink</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -134,6 +141,14 @@ export function SegmentTable({ customers, total, segment }: Props) {
                     </td>
                     <td className="px-4 py-3 text-right text-amber-400 font-semibold tabular-nums text-xs">
                       {(c.points_balance ?? 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {c.rfm_r != null
+                        ? <span className="text-xs font-mono text-stone-400">
+                            <span className="text-green-400">{c.rfm_r}</span>-<span className="text-blue-400">{c.rfm_f}</span>-<span className="text-amber-400">{c.rfm_m}</span>
+                          </span>
+                        : <span className="text-stone-600 text-xs">—</span>
+                      }
                     </td>
                     <td className="px-4 py-3 text-stone-400 text-xs max-w-[160px] truncate">
                       {c.favourite_item ?? '—'}

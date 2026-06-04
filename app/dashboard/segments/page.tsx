@@ -1,8 +1,10 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { SegmentTable } from '@/components/segments/SegmentTable'
+import { RfmFilterChips } from '@/components/segments/RfmFilterChips'
 import type { Segment } from '@/lib/types'
 
 const ALL_SEGMENTS: Segment[] = ['Regular', 'Explorer', 'Flickerer', 'Ghost', 'Hoarder', 'GroupBuyer', 'Dormant']
@@ -69,14 +71,29 @@ const SEGMENT_META: Record<Segment, {
 export default async function SegmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ segment?: string }>
+  searchParams: Promise<{ segment?: string; r?: string; f?: string; m?: string }>
 }) {
-  const { segment: rawSegment } = await searchParams
-  const activeSegment: Segment = (ALL_SEGMENTS.includes(rawSegment as Segment) ? rawSegment : 'Dormant') as Segment
+  const sp = await searchParams
+  const activeSegment: Segment = (ALL_SEGMENTS.includes(sp.segment as Segment) ? sp.segment : 'Dormant') as Segment
+
+  const parseScores = (v?: string) => (v ?? '').split(',').filter(Boolean).map(Number).filter(n => n >= 1 && n <= 5)
+  const rfmR = parseScores(sp.r)
+  const rfmF = parseScores(sp.f)
+  const rfmM = parseScores(sp.m)
+  const hasRfmFilter = rfmR.length > 0 || rfmF.length > 0 || rfmM.length > 0
+
+  // Build segment chip href — preserve existing RFM filters
+  function segmentHref(seg: string) {
+    const p = new URLSearchParams({ segment: seg })
+    if (rfmR.length) p.set('r', rfmR.join(','))
+    if (rfmF.length) p.set('f', rfmF.join(','))
+    if (rfmM.length) p.set('m', rfmM.join(','))
+    return `/dashboard/segments?${p.toString()}`
+  }
 
   const supabase = await createClient()
 
-  // Segment counts — one count query per segment, no row cap
+  // Segment counts (unfiltered, for chip badges)
   const segCountResults = await Promise.all(
     ALL_SEGMENTS.map(seg =>
       supabase.from('customers').select('*', { count: 'exact', head: true }).eq('segment', seg).eq('is_active', 1)
@@ -86,17 +103,27 @@ export default async function SegmentsPage({
     ALL_SEGMENTS.map((seg, i) => [seg, segCountResults[i].count ?? 0])
   ) as Record<Segment, number>
 
-  // Customers for active segment (display — capped at 1000)
-  const { data: customers } = await supabase
+  // Filtered count and customer rows
+  let countQ = supabase.from('customers').select('*', { count: 'exact', head: true }).eq('segment', activeSegment).eq('is_active', 1)
+  if (rfmR.length) countQ = countQ.in('rfm_r', rfmR)
+  if (rfmF.length) countQ = countQ.in('rfm_f', rfmF)
+  if (rfmM.length) countQ = countQ.in('rfm_m', rfmM)
+
+  let custQ = supabase
     .from('customers')
-    .select('crm_id, first_name, last_name, mobile, segment, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, favourite_item')
+    .select('crm_id, first_name, last_name, mobile, segment, rfm_r, rfm_f, rfm_m, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, favourite_item')
     .eq('segment', activeSegment)
     .eq('is_active', 1)
     .order('last_visit_date', { ascending: false, nullsFirst: false })
     .limit(1000)
+  if (rfmR.length) custQ = custQ.in('rfm_r', rfmR)
+  if (rfmF.length) custQ = custQ.in('rfm_f', rfmF)
+  if (rfmM.length) custQ = custQ.in('rfm_m', rfmM)
+
+  const [{ count: filteredCount }, { data: customers }] = await Promise.all([countQ, custQ])
 
   const meta = SEGMENT_META[activeSegment]
-  const totalForSegment = segCounts[activeSegment]
+  const totalForSegment = filteredCount ?? 0
 
   return (
     <div className="p-8 max-w-7xl">
@@ -116,7 +143,7 @@ export default async function SegmentsPage({
           return (
             <Link
               key={seg}
-              href={`/dashboard/segments?segment=${seg}`}
+              href={segmentHref(seg)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all duration-150 ${
                 isActive
                   ? m.chipActive
@@ -133,6 +160,13 @@ export default async function SegmentsPage({
             </Link>
           )
         })}
+      </div>
+
+      {/* ── RFM filter ────────────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <Suspense>
+          <RfmFilterChips />
+        </Suspense>
       </div>
 
       {/* ── Active segment explainer ───────────────────────────────────────── */}
@@ -212,10 +246,24 @@ export default async function SegmentsPage({
       </details>
 
       {/* ── Customer table ─────────────────────────────────────────────────── */}
+      {hasRfmFilter && (
+        <div className="flex items-center gap-2 mb-3 text-xs text-stone-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          RFM filter active —
+          {rfmR.length > 0 && <span>R ∈ {'{' + rfmR.join(', ') + '}'}</span>}
+          {rfmF.length > 0 && <span>F ∈ {'{' + rfmF.join(', ') + '}'}</span>}
+          {rfmM.length > 0 && <span>M ∈ {'{' + rfmM.join(', ') + '}'}</span>}
+          <span className="text-stone-500">·</span>
+          <span className="text-stone-300 font-semibold">{totalForSegment.toLocaleString()} customers match</span>
+        </div>
+      )}
       <SegmentTable
         customers={customers ?? []}
         total={totalForSegment}
         segment={activeSegment}
+        rfmR={rfmR}
+        rfmF={rfmF}
+        rfmM={rfmM}
       />
     </div>
   )
