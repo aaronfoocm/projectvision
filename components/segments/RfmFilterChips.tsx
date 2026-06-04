@@ -61,6 +61,33 @@ function RfmDim({ label, param, activeClass, labelClass }: DimProps) {
   )
 }
 
+function ClearAllButton() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const params = useSearchParams()
+
+  const hasAny = ['r', 'f', 'm'].some(p => params.get(p))
+  if (!hasAny) return null
+
+  function clearAll() {
+    const next = new URLSearchParams(params.toString())
+    next.delete('r'); next.delete('f'); next.delete('m')
+    router.push(`${pathname}?${next.toString()}`)
+  }
+
+  return (
+    <button
+      onClick={clearAll}
+      className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-stone-400 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 hover:text-white px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <path d="M2 2l8 8M10 2l-8 8" />
+      </svg>
+      Clear all filters
+    </button>
+  )
+}
+
 export function RfmFilterChips() {
   return (
     <div className="bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2.5">
@@ -68,7 +95,8 @@ export function RfmFilterChips() {
       <RfmDim label="R" param="r" labelClass="text-green-400" activeClass="bg-green-500/20 border-green-500/50 text-green-300" />
       <RfmDim label="F" param="f" labelClass="text-blue-400"  activeClass="bg-blue-500/20 border-blue-500/50 text-blue-300" />
       <RfmDim label="M" param="m" labelClass="text-amber-400" activeClass="bg-amber-500/20 border-amber-500/50 text-amber-300" />
-      <span className="text-xs text-stone-600 ml-auto">Select multiple values · empty = all</span>
+      <ClearAllButton />
+      <span className="text-xs text-stone-600 w-full">Select multiple values per dimension · empty = show all</span>
     </div>
   )
 }
