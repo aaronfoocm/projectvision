@@ -45,7 +45,33 @@ export default async function CustomerProfilePage({
 
   if (!customer) notFound()
 
-  // Fetch bill items for those 5 transactions
+  // Top 3 most ordered items — fetch all txn IDs then all bill items
+  const { data: allTxnRefs } = await supabase
+    .from('transactions')
+    .select('koppiku_ref')
+    .eq('customer_id', id)
+    .limit(10000)
+
+  const allRefs = (allTxnRefs ?? []).map(t => t.koppiku_ref)
+  let top3Items: [string, number][] = []
+  if (allRefs.length) {
+    // Batch in chunks of 500 to avoid URL length limits
+    const itemCounts = new Map<string, number>()
+    for (let i = 0; i < allRefs.length; i += 500) {
+      const { data: chunk } = await supabase
+        .from('bill_items')
+        .select('item_name, item_qty')
+        .in('transaction_id', allRefs.slice(i, i + 500))
+        .eq('is_modifier', false)
+      for (const item of chunk ?? []) {
+        if (!item.item_name) continue
+        itemCounts.set(item.item_name, (itemCounts.get(item.item_name) ?? 0) + (item.item_qty ?? 1))
+      }
+    }
+    top3Items = [...itemCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
+  }
+
+  // Fetch bill items for the 5 recent transactions display
   const txnRefs = (recentTxns ?? []).map(t => t.koppiku_ref)
   const { data: billItems } = txnRefs.length
     ? await supabase
@@ -99,6 +125,11 @@ export default async function CustomerProfilePage({
                 {customer.current_loc_code && (
                   <span className="text-xs text-stone-500 flex items-center gap-1">
                     <MapPin size={11} />{customer.current_loc_code}
+                  </span>
+                )}
+                {customer.favourite_outlet && (
+                  <span className="text-xs text-stone-500 flex items-center gap-1">
+                    <MapPin size={11} />Fav outlet: <span className="font-mono text-stone-400">{customer.favourite_outlet}</span>
                   </span>
                 )}
               </div>
@@ -155,6 +186,36 @@ export default async function CustomerProfilePage({
           ))}
         </div>
       </div>
+
+      {/* ── Top 3 items ───────────────────────────────────────────────────── */}
+      {top3Items.length > 0 && (
+        <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 mb-4">
+          <p className="text-xs text-stone-500 uppercase font-semibold mb-3">Top items ordered</p>
+          <div className="space-y-2.5">
+            {top3Items.map(([item, count], i) => {
+              const maxCount = top3Items[0][1]
+              const pct = Math.round((count / maxCount) * 100)
+              return (
+                <div key={item} className="flex items-center gap-3">
+                  <span className="text-stone-600 text-xs font-mono w-3 flex-shrink-0">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-stone-300 text-xs font-medium truncate">{item}</span>
+                      <span className="text-stone-500 text-xs tabular-nums ml-3 flex-shrink-0">{count}×</span>
+                    </div>
+                    <div className="h-1 bg-stone-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500/60 rounded-full"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Last 5 transactions ────────────────────────────────────────────── */}
       {(recentTxns ?? []).length > 0 && (

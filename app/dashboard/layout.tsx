@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Coffee } from 'lucide-react'
 import { NavLink } from '@/components/layout/NavLink'
+import { NavigationProgress } from '@/components/layout/NavigationProgress'
 
 const nav = [
   { href: '/dashboard',          label: 'Dashboard' },
@@ -20,6 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen bg-stone-950">
+      <Suspense><NavigationProgress /></Suspense>
       <aside className="w-56 bg-stone-900 border-r border-stone-800 flex flex-col fixed inset-y-0">
         <div className="px-4 py-5 border-b border-stone-800">
           <div className="flex items-center gap-2.5">

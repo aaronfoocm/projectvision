@@ -2,29 +2,39 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { CustomerCard } from '@/components/customers/CustomerCard'
 import { SearchBar } from '@/components/customers/SearchBar'
+import { OutletSelect } from '@/components/customers/OutletSelect'
 import { SEGMENT_META, ALL_SEGMENTS } from '@/lib/segment-meta'
 import type { Segment } from '@/lib/types'
 
 const LIMIT = 200
 
-interface SearchParams { q?: string; segment?: string; temp?: string; time?: string }
+interface SearchParams { q?: string; segment?: string; temp?: string; time?: string; outlet?: string }
 
 export default async function CustomersPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  const { q, segment, temp, time } = await searchParams
+  const { q, segment, temp, time, outlet } = await searchParams
   const supabase = await createClient()
+
+  // Fetch distinct outlet codes for the dropdown
+  const { data: outletRows } = await supabase
+    .from('customers')
+    .select('favourite_outlet')
+    .not('favourite_outlet', 'is', null)
+    .order('favourite_outlet', { ascending: true })
+  const outlets = [...new Set((outletRows ?? []).map(r => r.favourite_outlet as string))].sort()
 
   let query = supabase
     .from('customers')
-    .select('crm_id, first_name, last_name, email, mobile, segment, rfm_r, rfm_f, rfm_m')
+    .select('crm_id, first_name, last_name, email, mobile, segment, rfm_r, rfm_f, rfm_m, favourite_outlet')
     .eq('is_active', 1)
     .order('last_updated', { ascending: false })
     .limit(LIMIT)
 
   if (segment) query = query.eq('segment', segment)
+  if (outlet)  query = query.eq('favourite_outlet', outlet)
   if (q) {
     query = query.or(
       `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,mobile.ilike.%${q}%`,
@@ -47,7 +57,7 @@ export default async function CustomersPage({
     : (customers ?? [])
 
   const isAtLimit = filteredCustomers.length >= LIMIT
-  const hasFilters = !!(q || segment || temp || time)
+  const hasFilters = !!(q || segment || temp || time || outlet)
 
   return (
     <div className="p-8">
@@ -63,41 +73,48 @@ export default async function CustomersPage({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      {/* Search + outlet filter row */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex-1 min-w-[240px]">
           <Suspense>
             <SearchBar defaultValue={q ?? ''} />
           </Suspense>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <a
-            href="/dashboard/customers"
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150 cursor-pointer ${
-              !segment
-                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 font-semibold'
-                : 'border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-200'
-            }`}
-          >
-            All
-          </a>
-          {ALL_SEGMENTS.map(seg => {
-            const m = SEGMENT_META[seg as Segment]
-            const isActive = segment === seg
-            return (
-              <a
-                key={seg}
-                href={`/dashboard/customers?segment=${seg}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
-                className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150 cursor-pointer ${
-                  isActive
-                    ? `${m.chipActive} font-semibold`
-                    : 'border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-200'
-                }`}
-              >
-                {m.emoji} {seg}
-              </a>
-            )
-          })}
-        </div>
+        <Suspense>
+          <OutletSelect outlets={outlets} />
+        </Suspense>
+      </div>
+
+      {/* Segment chips */}
+      <div className="flex flex-wrap gap-1.5 mb-6">
+        <a
+          href={`/dashboard/customers${outlet ? `?outlet=${outlet}` : ''}`}
+          className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150 cursor-pointer ${
+            !segment
+              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 font-semibold'
+              : 'border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-200'
+          }`}
+        >
+          All
+        </a>
+        {ALL_SEGMENTS.map(seg => {
+          const m = SEGMENT_META[seg as Segment]
+          const isActive = segment === seg
+          const href = `/dashboard/customers?segment=${seg}${q ? `&q=${encodeURIComponent(q)}` : ''}${outlet ? `&outlet=${outlet}` : ''}`
+          return (
+            <a
+              key={seg}
+              href={href}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150 cursor-pointer ${
+                isActive
+                  ? `${m.chipActive} font-semibold`
+                  : 'border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-200'
+              }`}
+            >
+              {m.emoji} {seg}
+            </a>
+          )
+        })}
       </div>
 
       {filteredCustomers.length > 0 ? (
@@ -127,7 +144,7 @@ export default async function CustomersPage({
           <p className="text-stone-300 font-semibold text-sm">No customers found</p>
           <p className="text-stone-500 text-xs mt-1.5 max-w-xs leading-relaxed">
             {hasFilters
-              ? 'Try clearing the search or selecting a different segment filter.'
+              ? 'Try clearing the search or selecting a different filter.'
               : 'Upload customer CSVs from the Upload page to populate this list.'}
           </p>
           {hasFilters && (

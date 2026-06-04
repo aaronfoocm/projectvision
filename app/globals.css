@@ -9,3 +9,9 @@
   outline: 2px solid rgb(245 158 11 / 0.6);
   outline-offset: 2px;
 }
+
+@keyframes nav-progress {
+  0%   { width: 0%;   opacity: 1; }
+  85%  { width: 85%;  opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}

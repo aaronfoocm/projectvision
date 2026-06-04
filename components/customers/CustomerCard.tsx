@@ -10,6 +10,7 @@ interface Props {
   rfm_r: number | null
   rfm_f: number | null
   rfm_m: number | null
+  favourite_outlet?: string | null
   preferred_temp?: string | null
   preferred_time_slot?: string | null
   preferred_milk?: string | null
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export function CustomerCard(props: Props) {
-  const { crm_id, first_name, last_name, email, segment, rfm_r, rfm_f, rfm_m } = props
+  const { crm_id, first_name, last_name, email, segment, rfm_r, rfm_f, rfm_m, favourite_outlet } = props
   const name = [first_name, last_name].filter(Boolean).join(' ') || crm_id
   const meta = segment
     ? (SEGMENT_META[segment as keyof typeof SEGMENT_META] ?? SEGMENT_META.Dormant)
@@ -50,18 +51,23 @@ export function CustomerCard(props: Props) {
         preferred_milk={props.preferred_milk}
         favourite_drink={props.favourite_drink}
       />
-      {(rfm_r != null || rfm_f != null || rfm_m != null) && (
-        <div className="mt-2.5 text-xs text-stone-500">
-          RFM{' '}
-          <span className="font-mono tabular-nums">
-            <span className="text-green-400 font-semibold">{rfm_r ?? '-'}</span>
-            <span className="text-stone-600">-</span>
-            <span className="text-blue-400 font-semibold">{rfm_f ?? '-'}</span>
-            <span className="text-stone-600">-</span>
-            <span className="text-amber-400 font-semibold">{rfm_m ?? '-'}</span>
-          </span>
-        </div>
-      )}
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        {(rfm_r != null || rfm_f != null || rfm_m != null) ? (
+          <div className="text-xs text-stone-500">
+            RFM{' '}
+            <span className="font-mono tabular-nums">
+              <span className="text-green-400 font-semibold">{rfm_r ?? '-'}</span>
+              <span className="text-stone-600">-</span>
+              <span className="text-blue-400 font-semibold">{rfm_f ?? '-'}</span>
+              <span className="text-stone-600">-</span>
+              <span className="text-amber-400 font-semibold">{rfm_m ?? '-'}</span>
+            </span>
+          </div>
+        ) : <span />}
+        {favourite_outlet && (
+          <span className="text-[10px] text-stone-600 font-mono">{favourite_outlet}</span>
+        )}
+      </div>
     </a>
   )
 }
