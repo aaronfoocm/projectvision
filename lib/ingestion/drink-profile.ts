@@ -46,7 +46,7 @@ export function deriveDrinkProfile(items: BillItem[]): ComputedDrinkProfile {
   const milks = modifiers.filter(m => MILK_KEYWORDS.some(k => m.modifier_name?.toLowerCase().includes(k))).map(m => m.modifier_name!)
   const preferred_milk = mostFrequent(milks)
 
-  const sizes = modifiers.filter(m => SIZE_KEYWORDS.includes(m.modifier_name?.toLowerCase() ?? '')).map(m => m.modifier_name!)
+  const sizes = modifiers.filter(m => SIZE_KEYWORDS.some(k => m.modifier_name?.toLowerCase().includes(k))).map(m => m.modifier_name!)
   const preferred_size = mostFrequent(sizes)
 
   const favourite_drink = mostFrequent(parents.map(p => p.item_name).filter(Boolean) as string[])

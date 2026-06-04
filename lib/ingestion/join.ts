@@ -63,13 +63,22 @@ export function joinCsvs(csv1: Csv1Row[], csv2: Csv2Row[], csv3: Csv3Row[]): Joi
 
   const customerBillItems = new Map<string, BillItem[]>()
 
+  // Modifier rows in CSV2 have an empty Koppiku Ref # — build a lookup from
+  // Bill Line No. → Koppiku Ref # so modifiers can inherit their parent's ref.
+  const lineToRef = new Map<string, string>()
   for (const row of csv2) {
+    const lineNo = row['Bill Line No.']
     const ref = row['Koppiku Ref #']
+    if (lineNo && ref) lineToRef.set(lineNo, ref)
+  }
+
+  for (const row of csv2) {
+    const isModifier = !row['Zeoniq Reference #'] && !row['Koppiku Ref #']
+    const ref = row['Koppiku Ref #'] || lineToRef.get(row['Parent Bill Line No.'] ?? '') || ''
     if (!ref) continue
     const customerId = refToCustomerId.get(ref)
     if (!customerId) continue
 
-    const isModifier = !row['Zeoniq Reference #']
     const item: BillItem = {
       transaction_id: ref,
       bill_line_no: parseInt(row['Bill Line No.']) || null,
