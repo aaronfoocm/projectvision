@@ -3,12 +3,13 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 interface DimProps {
   label: string
+  fullLabel: string
   param: 'r' | 'f' | 'm'
   activeClass: string
   labelClass: string
 }
 
-function RfmDim({ label, param, activeClass, labelClass }: DimProps) {
+function RfmDim({ label, fullLabel, param, activeClass, labelClass }: DimProps) {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
@@ -32,27 +33,35 @@ function RfmDim({ label, param, activeClass, labelClass }: DimProps) {
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span className={`text-xs font-black font-mono w-4 ${labelClass}`}>{label}</span>
-      {[1, 2, 3, 4, 5].map(v => {
-        const isActive = current.includes(v)
-        return (
-          <button
-            key={v}
-            onClick={() => toggle(v)}
-            title={`${label} = ${v}`}
-            className={`w-7 h-7 rounded-lg text-xs font-bold font-mono border transition-all duration-150 cursor-pointer ${
-              isActive ? activeClass : 'text-stone-500 bg-stone-800/60 border-stone-700 hover:border-stone-500 hover:text-stone-300'
-            }`}
-          >
-            {v}
-          </button>
-        )
-      })}
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 w-24">
+        <span className={`text-xs font-black font-mono ${labelClass}`}>{label}</span>
+        <span className="text-xs text-stone-600">{fullLabel}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(v => {
+          const isActive = current.includes(v)
+          return (
+            <button
+              key={v}
+              onClick={() => toggle(v)}
+              title={`${label} = ${v}`}
+              className={`w-7 h-7 rounded-lg text-xs font-bold font-mono border transition-all duration-150 cursor-pointer ${
+                isActive
+                  ? activeClass
+                  : 'text-stone-500 bg-stone-800/60 border-stone-700 hover:border-stone-500 hover:text-stone-200'
+              }`}
+            >
+              {v}
+            </button>
+          )
+        })}
+      </div>
       {current.length > 0 && (
         <button
           onClick={clear}
-          className="text-xs text-stone-600 hover:text-stone-400 transition-colors ml-1 cursor-pointer"
+          className="text-xs text-stone-600 hover:text-stone-400 transition-colors cursor-pointer ml-0.5"
+          title={`Clear ${label} filter`}
         >
           clear
         </button>
@@ -78,25 +87,30 @@ function ClearAllButton() {
   return (
     <button
       onClick={clearAll}
-      className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-stone-400 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 hover:text-white px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
+      className="flex items-center gap-1.5 text-xs font-semibold text-stone-400 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 hover:text-stone-100 px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
     >
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-        <path d="M2 2l8 8M10 2l-8 8" />
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
       </svg>
-      Clear all filters
+      Clear all
     </button>
   )
 }
 
 export function RfmFilterChips() {
   return (
-    <div className="bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2.5">
-      <span className="text-xs text-stone-500 uppercase tracking-wide font-semibold">RFM filter</span>
-      <RfmDim label="R" param="r" labelClass="text-green-400" activeClass="bg-green-500/20 border-green-500/50 text-green-300" />
-      <RfmDim label="F" param="f" labelClass="text-blue-400"  activeClass="bg-blue-500/20 border-blue-500/50 text-blue-300" />
-      <RfmDim label="M" param="m" labelClass="text-amber-400" activeClass="bg-amber-500/20 border-amber-500/50 text-amber-300" />
-      <ClearAllButton />
-      <span className="text-xs text-stone-600 w-full">Select multiple values per dimension · empty = show all</span>
+    <div className="bg-stone-900 border border-stone-800 rounded-xl px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
+        <RfmDim label="R" fullLabel="Recency"   param="r" labelClass="text-green-400" activeClass="bg-green-500/20 border-green-500/50 text-green-300" />
+        <RfmDim label="F" fullLabel="Frequency" param="f" labelClass="text-blue-400"  activeClass="bg-blue-500/20 border-blue-500/50 text-blue-300" />
+        <RfmDim label="M" fullLabel="Monetary"  param="m" labelClass="text-amber-400" activeClass="bg-amber-500/20 border-amber-500/50 text-amber-300" />
+        <div className="ml-auto">
+          <ClearAllButton />
+        </div>
+      </div>
+      <p className="text-xs text-stone-600 mt-2.5">
+        Select multiple values per dimension. Empty selection = show all.
+      </p>
     </div>
   )
 }

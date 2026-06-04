@@ -1,15 +1,15 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { LayoutDashboard, Zap, Users, Upload, Coffee, DatabaseZap, PieChart } from 'lucide-react'
+import { NavLink } from '@/components/layout/NavLink'
 
 const nav = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/actions', label: 'Actions', icon: Zap },
-  { href: '/dashboard/segments', label: 'Segments', icon: PieChart },
-  { href: '/dashboard/customers', label: 'Customers', icon: Users },
-  { href: '/dashboard/upload', label: 'Upload', icon: Upload },
-  { href: '/dashboard/database', label: 'Database', icon: DatabaseZap },
+  { href: '/dashboard',          label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/actions',  label: 'Actions',   icon: Zap },
+  { href: '/dashboard/segments', label: 'Segments',  icon: PieChart },
+  { href: '/dashboard/customers',label: 'Customers', icon: Users },
+  { href: '/dashboard/upload',   label: 'Upload',    icon: Upload },
+  { href: '/dashboard/database', label: 'Database',  icon: DatabaseZap },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -27,20 +27,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
             <div>
               <p className="font-bold text-sm text-white leading-tight">Project Vision</p>
-              <p className="text-stone-400 text-xs">Koppiku CRM</p>
+              <p className="text-stone-500 text-xs">Koppiku CRM</p>
             </div>
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-stone-300 hover:bg-stone-800 hover:text-white transition-colors"
-            >
-              <Icon size={16} />
-              {label}
-            </Link>
+          {nav.map(item => (
+            <NavLink key={item.href} {...item} />
           ))}
         </nav>
         <div className="px-4 py-4 border-t border-stone-800">

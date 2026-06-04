@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { Download, Loader2, ExternalLink } from 'lucide-react'
+import { Download, Loader2, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { exportSegmentCSV } from '@/actions/segments'
+import { SEGMENT_META } from '@/lib/segment-meta'
 
 interface Customer {
   crm_id: string
@@ -20,25 +21,23 @@ interface Customer {
   favourite_item: string | null
 }
 
-const SEGMENT_COLORS: Record<string, string> = {
-  Regular:    'bg-green-500/15 text-green-400 border-green-500/25',
-  Explorer:   'bg-blue-500/15 text-blue-400 border-blue-500/25',
-  Flickerer:  'bg-orange-500/15 text-orange-400 border-orange-500/25',
-  Ghost:      'bg-red-500/15 text-red-400 border-red-500/25',
-  Hoarder:    'bg-purple-500/15 text-purple-400 border-purple-500/25',
-  GroupBuyer: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/25',
-  Dormant:    'bg-stone-500/15 text-stone-400 border-stone-500/25',
-}
+type SortKey = 'name' | 'visits' | 'last_visit' | 'avg_gap' | 'points' | 'rfm'
+type SortDir = 'asc' | 'desc'
 
 function formatDate(d: string | null) {
-  if (!d) return '—'
+  if (!d) return null
   return String(d).slice(0, 10)
 }
 
-function formatMobile(m: string | null) {
-  if (!m) return '—'
-  // Malaysian: 601X → +60 1X-XXXX-XXXX
-  return `+${m}`
+function rfmScore(c: Customer) {
+  return (c.rfm_r ?? 0) + (c.rfm_f ?? 0) + (c.rfm_m ?? 0)
+}
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (col !== sortKey) return <ChevronsUpDown size={11} className="text-stone-700 ml-1 inline" />
+  return sortDir === 'asc'
+    ? <ChevronUp size={11} className="text-amber-400 ml-1 inline" />
+    : <ChevronDown size={11} className="text-amber-400 ml-1 inline" />
 }
 
 interface Props {
@@ -52,6 +51,39 @@ interface Props {
 
 export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Props) {
   const [exporting, setExporting] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>('visits')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  const sorted = [...customers].sort((a, b) => {
+    let va: number | string = 0
+    let vb: number | string = 0
+    if (sortKey === 'name') {
+      va = [a.first_name, a.last_name].filter(Boolean).join(' ').toLowerCase()
+      vb = [b.first_name, b.last_name].filter(Boolean).join(' ').toLowerCase()
+    } else if (sortKey === 'visits') {
+      va = a.total_visits ?? 0; vb = b.total_visits ?? 0
+    } else if (sortKey === 'last_visit') {
+      va = a.last_visit_date ?? ''; vb = b.last_visit_date ?? ''
+    } else if (sortKey === 'avg_gap') {
+      va = a.avg_gap_days ?? 0; vb = b.avg_gap_days ?? 0
+    } else if (sortKey === 'points') {
+      va = a.points_balance ?? 0; vb = b.points_balance ?? 0
+    } else if (sortKey === 'rfm') {
+      va = rfmScore(a); vb = rfmScore(b)
+    }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1
+    if (va > vb) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
 
   async function handleExport() {
     setExporting(true)
@@ -69,15 +101,33 @@ export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Pr
     }
   }
 
+  function SortTh({ label, col, align = 'right' }: { label: string; col: SortKey; align?: 'left' | 'right' }) {
+    return (
+      <th className={`px-4 py-3 font-medium text-${align}`}>
+        <button
+          onClick={() => toggleSort(col)}
+          className="inline-flex items-center gap-0.5 hover:text-stone-300 transition-colors duration-150 cursor-pointer"
+        >
+          {label}
+          <SortIcon col={col} sortKey={sortKey} sortDir={sortDir} />
+        </button>
+      </th>
+    )
+  }
+
+  const isTruncated = customers.length < total
+
   return (
-    <div className="bg-stone-900 border border-stone-800 rounded-2xl overflow-hidden">
-      {/* Table header bar */}
+    <div className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
+      {/* Header bar */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800">
         <div>
           <p className="text-white font-semibold text-sm">{segment} customers</p>
-          <p className="text-stone-500 text-xs mt-0.5">
+          <p className="text-stone-500 text-xs mt-0.5 tabular-nums">
             Showing {customers.length.toLocaleString()} of {total.toLocaleString()}
-            {total > customers.length && ' — export for full list'}
+            {isTruncated && (
+              <span className="text-amber-500/80"> — export CSV for full list</span>
+            )}
           </p>
         </div>
         <button
@@ -86,35 +136,42 @@ export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Pr
           className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold px-4 py-2 rounded-lg hover:bg-amber-500/25 transition-colors duration-150 disabled:opacity-40 cursor-pointer"
         >
           {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-          {exporting ? `Exporting ${total.toLocaleString()}…` : `Export CSV (${total.toLocaleString()})`}
+          {exporting ? `Exporting ${total.toLocaleString()}...` : `Export CSV (${total.toLocaleString()})`}
         </button>
       </div>
 
       {customers.length === 0 ? (
-        <div className="text-center py-16 text-stone-500">
-          <p className="text-sm">No customers in this segment yet.</p>
+        <div className="text-center py-20">
+          <p className="text-stone-600 text-3xl mb-3">0</p>
+          <p className="text-stone-400 font-semibold text-sm">No customers in this segment</p>
+          <p className="text-stone-600 text-xs mt-1.5 max-w-xs mx-auto">
+            {rfmR.length || rfmF.length || rfmM.length
+              ? 'Try removing some RFM filters — the combination may yield no matches.'
+              : 'Upload a new CSV to populate this segment, or customers may have moved to another segment.'}
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-stone-500 text-xs uppercase tracking-wide border-b border-stone-800 bg-stone-900/50">
-                <th className="text-left px-5 py-3 font-medium">Customer</th>
+              <tr className="text-stone-500 text-xs uppercase tracking-wide border-b border-stone-800 bg-stone-950/40">
+                <SortTh label="Customer" col="name" align="left" />
                 <th className="text-left px-4 py-3 font-medium">Mobile</th>
                 <th className="text-left px-4 py-3 font-medium">Segment</th>
-                <th className="text-right px-4 py-3 font-medium">Visits</th>
-                <th className="text-right px-4 py-3 font-medium">Last Visit</th>
-                <th className="text-right px-4 py-3 font-medium">Avg Gap</th>
-                <th className="text-right px-4 py-3 font-medium">Points</th>
-                <th className="text-right px-4 py-3 font-medium">RFM</th>
+                <SortTh label="Visits" col="visits" />
+                <SortTh label="Last Visit" col="last_visit" />
+                <SortTh label="Avg Gap" col="avg_gap" />
+                <SortTh label="Points" col="points" />
+                <SortTh label="RFM" col="rfm" />
                 <th className="text-left px-4 py-3 font-medium">Fav Drink</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-800/60">
-              {customers.map(c => {
+            <tbody className="divide-y divide-stone-800/50">
+              {sorted.map(c => {
                 const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.crm_id
-                const segColor = SEGMENT_COLORS[c.segment ?? ''] ?? SEGMENT_COLORS.Dormant
+                const meta = SEGMENT_META[c.segment as keyof typeof SEGMENT_META] ?? SEGMENT_META.Dormant
+                const visitDate = formatDate(c.last_visit_date)
                 return (
                   <tr
                     key={c.crm_id}
@@ -128,35 +185,45 @@ export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Pr
                         <span className="text-white font-medium text-sm">{name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-stone-400 text-xs font-mono">{formatMobile(c.mobile)}</td>
+                    <td className="px-4 py-3 text-stone-400 text-xs font-mono tabular-nums">
+                      {c.mobile ? `+${c.mobile}` : <span className="text-stone-600">-</span>}
+                    </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${segColor}`}>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${meta.badge}`}>
                         {c.segment}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-stone-300 tabular-nums">{c.total_visits ?? 0}</td>
-                    <td className="px-4 py-3 text-right text-stone-400 text-xs">{formatDate(c.last_visit_date)}</td>
-                    <td className="px-4 py-3 text-right text-stone-400 text-xs">
-                      {c.avg_gap_days ? `${Math.round(c.avg_gap_days)}d` : '—'}
+                    <td className="px-4 py-3 text-right text-stone-300 tabular-nums font-mono text-xs">
+                      {c.total_visits ?? 0}
                     </td>
-                    <td className="px-4 py-3 text-right text-amber-400 font-semibold tabular-nums text-xs">
+                    <td className="px-4 py-3 text-right text-stone-400 text-xs tabular-nums">
+                      {visitDate ?? <span className="text-stone-600">-</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right text-stone-400 text-xs tabular-nums">
+                      {c.avg_gap_days ? `${Math.round(c.avg_gap_days)}d` : <span className="text-stone-600">-</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right text-amber-400 font-semibold tabular-nums font-mono text-xs">
                       {(c.points_balance ?? 0).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {c.rfm_r != null
-                        ? <span className="text-xs font-mono text-stone-400">
-                            <span className="text-green-400">{c.rfm_r}</span>-<span className="text-blue-400">{c.rfm_f}</span>-<span className="text-amber-400">{c.rfm_m}</span>
+                        ? <span className="text-xs font-mono tabular-nums">
+                            <span className="text-green-400">{c.rfm_r}</span>
+                            <span className="text-stone-600">-</span>
+                            <span className="text-blue-400">{c.rfm_f}</span>
+                            <span className="text-stone-600">-</span>
+                            <span className="text-amber-400">{c.rfm_m}</span>
                           </span>
-                        : <span className="text-stone-600 text-xs">—</span>
+                        : <span className="text-stone-600 text-xs">-</span>
                       }
                     </td>
                     <td className="px-4 py-3 text-stone-400 text-xs max-w-[160px] truncate">
-                      {c.favourite_item ?? '—'}
+                      {c.favourite_item ?? <span className="text-stone-600">-</span>}
                     </td>
                     <td className="px-4 py-3">
                       <a
                         href={`/dashboard/customers/${c.crm_id}`}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-stone-500 hover:text-white"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-stone-500 hover:text-white cursor-pointer"
                         title="View profile"
                       >
                         <ExternalLink size={13} />
