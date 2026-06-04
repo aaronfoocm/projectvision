@@ -105,6 +105,7 @@ export const SEGMENT_META: Record<Segment, SegmentMeta> = {
   },
 }
 
+// Hoarder hidden from UI — data preserved in DB, segment assignment unchanged
 export const ALL_SEGMENTS: Segment[] = [
-  'Regular', 'Explorer', 'Flickerer', 'Ghost', 'Hoarder', 'GroupBuyer', 'Dormant',
+  'Regular', 'Explorer', 'Flickerer', 'Ghost', 'GroupBuyer', 'Dormant',
 ]
