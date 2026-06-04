@@ -179,21 +179,37 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
   // ── Fetch historical data ──────────────────────────────────────────────────
   const allCustomerIds = [...joined.customerTransactions.keys()]
 
-  const { data: existingCustomers } = await supabase
-    .from('customers')
-    .select('crm_id, segment, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, avg_item_quantity, favourite_item, favourite_outlet')
-    .in('crm_id', allCustomerIds)
-  const existingById = new Map((existingCustomers ?? []).map(c => [c.crm_id, c]))
+  // Paginate all three lookups — default PostgREST cap is 1000 rows which would
+  // silently truncate data for large batches and produce wrong total_visits counts.
+  const PAGE = 1000
+  type ExistingCustomer = { crm_id: string; segment: string | null; total_visits: number; last_visit_date: string | null; avg_gap_days: number | null; points_balance: number; outlet_count: number; avg_item_quantity: number; favourite_item: string | null; favourite_outlet: string | null }
+  type HistoricTxn = { customer_id: string; transaction_date: string | null; outlet_code: string | null; net_sales: number }
+  type JourneyRow = { customer_id: string; message_template: string; action_date: string }
 
-  const { data: historicTxns } = await supabase
-    .from('transactions')
-    .select('customer_id, transaction_date, outlet_code, net_sales')
-    .in('customer_id', allCustomerIds)
+  const existingCustomers: ExistingCustomer[] = []
+  const historicTxns: HistoricTxn[] = []
+  const journeyRows: JourneyRow[] = []
 
-  const { data: journeyRows } = await supabase
-    .from('journey_log')
-    .select('customer_id, message_template, action_date')
-    .in('customer_id', allCustomerIds)
+  for (let i = 0; i < allCustomerIds.length; i += PAGE) {
+    const chunk = allCustomerIds.slice(i, i + PAGE)
+    const [ec, ht, jr] = await Promise.all([
+      supabase.from('customers')
+        .select('crm_id, segment, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, avg_item_quantity, favourite_item, favourite_outlet')
+        .in('crm_id', chunk),
+      supabase.from('transactions')
+        .select('customer_id, transaction_date, outlet_code, net_sales')
+        .in('customer_id', chunk)
+        .limit(100_000),
+      supabase.from('journey_log')
+        .select('customer_id, message_template, action_date')
+        .in('customer_id', chunk),
+    ])
+    if (ec.data) existingCustomers.push(...ec.data as ExistingCustomer[])
+    if (ht.data) historicTxns.push(...ht.data as HistoricTxn[])
+    if (jr.data) journeyRows.push(...jr.data as JourneyRow[])
+  }
+
+  const existingById = new Map(existingCustomers.map(c => [c.crm_id, c]))
 
   const journeyByCustomer = new Map<string, Array<{ template: string; days_ago: number }>>()
   for (const row of journeyRows ?? []) {
