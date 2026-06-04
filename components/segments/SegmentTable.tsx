@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Download, Loader2, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { exportSegmentCSV } from '@/actions/segments'
 import { SEGMENT_META } from '@/lib/segment-meta'
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Props) {
+  const router = useRouter()
   const [exporting, setExporting] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('visits')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -175,7 +177,8 @@ export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Pr
                 return (
                   <tr
                     key={c.crm_id}
-                    className="hover:bg-stone-800/40 transition-colors duration-100 group"
+                    onClick={() => router.push(`/dashboard/customers/${c.crm_id}`)}
+                    className="hover:bg-stone-800/50 transition-colors duration-100 group cursor-pointer"
                   >
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -221,13 +224,7 @@ export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Pr
                       {c.favourite_item ?? <span className="text-stone-600">-</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <a
-                        href={`/dashboard/customers/${c.crm_id}`}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-stone-500 hover:text-white cursor-pointer"
-                        title="View profile"
-                      >
-                        <ExternalLink size={13} />
-                      </a>
+                      <ExternalLink size={13} className="opacity-0 group-hover:opacity-60 transition-opacity duration-150 text-stone-400" />
                     </td>
                   </tr>
                 )
