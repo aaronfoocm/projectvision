@@ -18,13 +18,19 @@ export default async function CustomersPage({
   const { q, segment, temp, time, outlet } = await searchParams
   const supabase = await createClient()
 
-  // Fetch distinct outlet codes for the dropdown
-  const { data: outletRows } = await supabase
-    .from('customers')
-    .select('favourite_outlet')
-    .not('favourite_outlet', 'is', null)
-    .order('favourite_outlet', { ascending: true })
-  const outlets = [...new Set((outletRows ?? []).map(r => r.favourite_outlet as string))].sort()
+  // Paginate to get all distinct outlet codes (single-column, 1000-row pages)
+  const allOutletRows: string[] = []
+  let outletFrom = 0
+  while (true) {
+    const { data } = await supabase.from('customers')
+      .select('favourite_outlet').not('favourite_outlet', 'is', null)
+      .range(outletFrom, outletFrom + 999)
+    if (!data || data.length === 0) break
+    for (const r of data) if (r.favourite_outlet) allOutletRows.push(r.favourite_outlet)
+    if (data.length < 1000) break
+    outletFrom += 1000
+  }
+  const outlets = [...new Set(allOutletRows)].sort()
 
   let query = supabase
     .from('customers')
