@@ -17,10 +17,10 @@ export async function exportSegmentCSV(
     let q = supabase
       .from('customers')
       .select('crm_id, first_name, last_name, mobile, segment, rfm_r, rfm_f, rfm_m, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, favourite_item, current_loc_code')
-      .eq('segment', segment)
       .eq('is_active', 1)
-      .order('last_visit_date', { ascending: false, nullsFirst: false })
-      .range(from, from + PAGE - 1)
+
+    if (segment && segment !== 'All') q = q.eq('segment', segment)
+    q = q.order('last_visit_date', { ascending: false, nullsFirst: false }).range(from, from + PAGE - 1)
 
     if (rfmR.length) q = q.in('rfm_r', rfmR)
     if (rfmF.length) q = q.in('rfm_f', rfmF)

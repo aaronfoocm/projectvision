@@ -1,15 +1,11 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Suspense } from 'react'
 import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { SegmentTable } from '@/components/segments/SegmentTable'
-import { RfmFilterChips } from '@/components/segments/RfmFilterChips'
-import { TimeFilterChips } from '@/components/segments/TimeFilterChips'
-import { DropdownFilter } from '@/components/segments/DropdownFilter'
-import { SEGMENT_META, ALL_SEGMENTS } from '@/lib/segment-meta'
-import { Skeleton } from '@/components/ui/Skeleton'
+import { FilterPanel } from '@/components/segments/FilterPanel'
+import { ALL_SEGMENTS } from '@/lib/segment-meta'
 import type { Segment } from '@/lib/types'
 
 const PAGE_SIZE = 1000
@@ -45,9 +41,6 @@ export default async function SegmentsPage({
       f: rfmF.length ? rfmF.join(',') : null,
       m: rfmM.length ? rfmM.join(',') : null,
       time: timeFilter || null,
-      outlet: outletFilter || null,
-      loc: locFilter || null,
-      drink: drinkFilter || null,
       page: page > 1 ? String(page) : null,
       ...overrides,
     }
@@ -164,90 +157,12 @@ export default async function SegmentsPage({
         </Link>
       </div>
 
-      {/* Segment chips */}
-      <div className="mb-4">
-        <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold mb-2">Segment</p>
-        <div className="flex flex-wrap gap-2">
-          <Link href={buildHref({ segment: null, page: null })}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-semibold transition-all duration-150 cursor-pointer ${
-              !activeSegment ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-stone-900 border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-200'
-            }`}
-          >
-            All
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md tabular-nums ${!activeSegment ? 'bg-white/10' : 'bg-stone-800 text-stone-500'}`}>
-              {ALL_SEGMENTS.reduce((s, seg) => s + segCounts[seg], 0).toLocaleString()}
-            </span>
-          </Link>
-          {ALL_SEGMENTS.map(seg => {
-            const m = SEGMENT_META[seg]
-            const isActive = seg === activeSegment
-            return (
-              <Link key={seg} href={buildHref({ segment: seg, page: null })}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                  isActive ? m.chipActive : 'bg-stone-900 border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-200'
-                }`}
-              >
-                <span className={`text-base leading-none ${m.color}`}>{m.emoji}</span>
-                {seg}
-                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md tabular-nums ${isActive ? 'bg-white/10' : 'bg-stone-800 text-stone-500'}`}>
-                  {segCounts[seg].toLocaleString()}
-                </span>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Filters row */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {/* RFM */}
-        <div>
-          <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold mb-2">RFM Filter</p>
-          <Suspense fallback={<Skeleton className="h-14 w-full rounded-xl" />}>
-            <RfmFilterChips />
-          </Suspense>
-        </div>
-        {/* Time of day */}
-        <div>
-          <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold mb-2">Time of Day</p>
-          <Suspense fallback={<Skeleton className="h-14 w-full rounded-xl" />}>
-            <TimeFilterChips />
-          </Suspense>
-        </div>
-      </div>
-
-      {/* Outlet / Location / Drink dropdowns */}
-      <div className="flex flex-wrap gap-4 mb-6">
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold">Most Visited Outlet</p>
-          <Suspense fallback={<Skeleton className="h-9 w-48 rounded-lg" />}>
-            <DropdownFilter param="outlet" options={distinctOutlets} placeholder="All outlets" className="min-w-[180px]" />
-          </Suspense>
-        </div>
-        {distinctLocs.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold">Current Location</p>
-            <Suspense fallback={<Skeleton className="h-9 w-48 rounded-lg" />}>
-              <DropdownFilter param="loc" options={distinctLocs} placeholder="All locations" className="min-w-[180px]" />
-            </Suspense>
-          </div>
-        )}
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold">Favourite Drink</p>
-          <Suspense fallback={<Skeleton className="h-9 w-52 rounded-lg" />}>
-            <DropdownFilter param="drink" options={distinctDrinks} placeholder="All drinks" className="min-w-[200px]" />
-          </Suspense>
-        </div>
-        {hasAnyFilter && (
-          <div className="flex flex-col justify-end">
-            <Link href="/dashboard/segments"
-              className="text-xs text-stone-500 hover:text-stone-300 border border-stone-700 hover:border-stone-500 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer"
-            >
-              Clear all
-            </Link>
-          </div>
-        )}
-      </div>
+      <FilterPanel
+        segCounts={segCounts}
+        distinctOutlets={distinctOutlets}
+        distinctLocs={distinctLocs}
+        distinctDrinks={distinctDrinks}
+      />
 
       {/* Active filter summary */}
       {hasAnyFilter && (
