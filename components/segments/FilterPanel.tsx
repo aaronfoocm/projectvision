@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { SEGMENT_META, ALL_SEGMENTS } from '@/lib/segment-meta'
+import { MultiSelectSearch } from '@/components/segments/MultiSelectSearch'
 import type { Segment } from '@/lib/types'
 
 const TIME_SLOTS = [
@@ -18,9 +19,9 @@ interface FilterState {
   rfmF: number[]
   rfmM: number[]
   time: string
-  outlet: string
-  loc: string
-  drink: string
+  outlet: string[]
+  loc: string[]
+  drink: string[]
 }
 
 interface Props {
@@ -33,15 +34,17 @@ interface Props {
 function parseParams(params: ReturnType<typeof useSearchParams>): FilterState {
   const parseScores = (v: string | null) =>
     (v ?? '').split(',').filter(Boolean).map(Number).filter(n => n >= 1 && n <= 5)
+  const parseList = (v: string | null) =>
+    (v ?? '').split(',').filter(Boolean)
   return {
     segment: ALL_SEGMENTS.includes(params.get('segment') as Segment) ? (params.get('segment') as Segment) : null,
     rfmR: parseScores(params.get('r')),
     rfmF: parseScores(params.get('f')),
     rfmM: parseScores(params.get('m')),
     time: params.get('time') ?? '',
-    outlet: params.get('outlet') ?? '',
-    loc: params.get('loc') ?? '',
-    drink: params.get('drink') ?? '',
+    outlet: parseList(params.get('outlet')),
+    loc: parseList(params.get('loc')),
+    drink: parseList(params.get('drink')),
   }
 }
 
@@ -52,22 +55,22 @@ function stateToSearch(s: FilterState): string {
   if (s.rfmF.length) p.set('f', s.rfmF.join(','))
   if (s.rfmM.length) p.set('m', s.rfmM.join(','))
   if (s.time) p.set('time', s.time)
-  if (s.outlet) p.set('outlet', s.outlet)
-  if (s.loc) p.set('loc', s.loc)
-  if (s.drink) p.set('drink', s.drink)
+  if (s.outlet.length) p.set('outlet', s.outlet.join(','))
+  if (s.loc.length) p.set('loc', s.loc.join(','))
+  if (s.drink.length) p.set('drink', s.drink.join(','))
   const qs = p.toString()
   return qs ? `?${qs}` : ''
 }
 
 function hasFilters(s: FilterState) {
-  return !!(s.segment || s.rfmR.length || s.rfmF.length || s.rfmM.length || s.time || s.outlet || s.loc || s.drink)
+  return !!(s.segment || s.rfmR.length || s.rfmF.length || s.rfmM.length || s.time || s.outlet.length || s.loc.length || s.drink.length)
 }
 
 function isDiff(a: FilterState, b: FilterState) {
   return JSON.stringify(a) !== JSON.stringify(b)
 }
 
-const EMPTY: FilterState = { segment: null, rfmR: [], rfmF: [], rfmM: [], time: '', outlet: '', loc: '', drink: '' }
+const EMPTY: FilterState = { segment: null, rfmR: [], rfmF: [], rfmM: [], time: '', outlet: [], loc: [], drink: [] }
 
 export function FilterPanel({ segCounts, distinctOutlets, distinctLocs, distinctDrinks }: Props) {
   const router   = useRouter()
@@ -87,9 +90,9 @@ export function FilterPanel({ segCounts, distinctOutlets, distinctLocs, distinct
     pending.rfmF.length ? 1 : 0,
     pending.rfmM.length ? 1 : 0,
     pending.time ? 1 : 0,
-    pending.outlet ? 1 : 0,
-    pending.loc ? 1 : 0,
-    pending.drink ? 1 : 0,
+    pending.outlet.length ? 1 : 0,
+    pending.loc.length ? 1 : 0,
+    pending.drink.length ? 1 : 0,
   ].reduce((a, b) => a + b, 0)
 
   function apply() {
@@ -249,45 +252,42 @@ export function FilterPanel({ segCounts, distinctOutlets, distinctLocs, distinct
         </div>
       </div>
 
-      {/* Dropdown filters + action bar */}
+      {/* Multi-select dropdowns + action bar */}
       <div className="flex flex-wrap items-end gap-4 mb-6">
         <div className="flex flex-col gap-1.5">
           <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold">Most Visited Outlet</p>
-          <select
-            value={pending.outlet}
-            onChange={e => setPending(prev => ({ ...prev, outlet: e.target.value }))}
-            className="text-xs bg-stone-900 border border-stone-700 text-stone-300 rounded-lg px-3 py-2 cursor-pointer hover:border-stone-500 transition-colors duration-150 focus:outline-none focus:border-amber-500/50 min-w-[180px]"
-          >
-            <option value="">All outlets</option>
-            {distinctOutlets.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          <MultiSelectSearch
+            options={distinctOutlets}
+            selected={pending.outlet}
+            onChange={vals => setPending(prev => ({ ...prev, outlet: vals }))}
+            placeholder="All outlets"
+            className="min-w-[180px]"
+          />
         </div>
         {distinctLocs.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold">Current Location</p>
-            <select
-              value={pending.loc}
-              onChange={e => setPending(prev => ({ ...prev, loc: e.target.value }))}
-              className="text-xs bg-stone-900 border border-stone-700 text-stone-300 rounded-lg px-3 py-2 cursor-pointer hover:border-stone-500 transition-colors duration-150 focus:outline-none focus:border-amber-500/50 min-w-[180px]"
-            >
-              <option value="">All locations</option>
-              {distinctLocs.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
+            <MultiSelectSearch
+              options={distinctLocs}
+              selected={pending.loc}
+              onChange={vals => setPending(prev => ({ ...prev, loc: vals }))}
+              placeholder="All locations"
+              className="min-w-[180px]"
+            />
           </div>
         )}
         <div className="flex flex-col gap-1.5">
           <p className="text-xs text-stone-600 uppercase tracking-wide font-semibold">Favourite Drink</p>
-          <select
-            value={pending.drink}
-            onChange={e => setPending(prev => ({ ...prev, drink: e.target.value }))}
-            className="text-xs bg-stone-900 border border-stone-700 text-stone-300 rounded-lg px-3 py-2 cursor-pointer hover:border-stone-500 transition-colors duration-150 focus:outline-none focus:border-amber-500/50 min-w-[200px]"
-          >
-            <option value="">All drinks</option>
-            {distinctDrinks.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          <MultiSelectSearch
+            options={distinctDrinks}
+            selected={pending.drink}
+            onChange={vals => setPending(prev => ({ ...prev, drink: vals }))}
+            placeholder="All drinks"
+            className="min-w-[200px]"
+          />
         </div>
 
-        {/* Action buttons — appear when pending differs from URL */}
+        {/* Action buttons */}
         {dirty ? (
           <div className="flex items-center gap-2 ml-auto">
             <button

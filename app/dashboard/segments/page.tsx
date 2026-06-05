@@ -20,9 +20,10 @@ export default async function SegmentsPage({
 }) {
   const sp = await searchParams
   const activeSegment  = ALL_SEGMENTS.includes(sp.segment as Segment) ? (sp.segment as Segment) : null
-  const outletFilter   = sp.outlet ?? ''
-  const locFilter      = sp.loc ?? ''
-  const drinkFilter    = sp.drink ?? ''
+  const parseList      = (v?: string) => (v ?? '').split(',').filter(Boolean)
+  const outletFilter   = parseList(sp.outlet)
+  const locFilter      = parseList(sp.loc)
+  const drinkFilter    = parseList(sp.drink)
 
   const parseScores    = (v?: string) => (v ?? '').split(',').filter(Boolean).map(Number).filter(n => n >= 1 && n <= 5)
   const rfmR           = parseScores(sp.r)
@@ -31,7 +32,7 @@ export default async function SegmentsPage({
   const timeFilter     = sp.time ?? ''
   const page           = Math.max(1, parseInt(sp.page ?? '1') || 1)
   const hasRfmFilter   = rfmR.length > 0 || rfmF.length > 0 || rfmM.length > 0
-  const hasAnyFilter   = !!activeSegment || hasRfmFilter || !!timeFilter || !!outletFilter || !!locFilter || !!drinkFilter
+  const hasAnyFilter   = !!activeSegment || hasRfmFilter || !!timeFilter || !!outletFilter.length || !!locFilter.length || !!drinkFilter.length
 
   function buildHref(overrides: Record<string, string | null>) {
     const p = new URLSearchParams()
@@ -41,6 +42,9 @@ export default async function SegmentsPage({
       f: rfmF.length ? rfmF.join(',') : null,
       m: rfmM.length ? rfmM.join(',') : null,
       time: timeFilter || null,
+      outlet: outletFilter.length ? outletFilter.join(',') : null,
+      loc: locFilter.length ? locFilter.join(',') : null,
+      drink: drinkFilter.length ? drinkFilter.join(',') : null,
       page: page > 1 ? String(page) : null,
       ...overrides,
     }
@@ -89,13 +93,13 @@ export default async function SegmentsPage({
   const segCountResults = await Promise.all(
     ALL_SEGMENTS.map(seg => {
       let q = supabase.from('customers')
-        .select(timeFilter || drinkFilter ? '*, drink_profiles!inner(preferred_time_slot, favourite_drink)' : '*',
+        .select(timeFilter || drinkFilter.length ? '*, drink_profiles!inner(preferred_time_slot, favourite_drink)' : '*',
           { count: 'exact', head: true })
         .eq('segment', seg).eq('is_active', 1)
-      if (outletFilter) q = q.eq('favourite_outlet', outletFilter)
-      if (locFilter)    q = q.eq('current_loc_code', locFilter)
-      if (timeFilter)   q = (q as any).eq('drink_profiles.preferred_time_slot', timeFilter)
-      if (drinkFilter)  q = (q as any).eq('drink_profiles.favourite_drink', drinkFilter)
+      if (outletFilter.length) q = q.in('favourite_outlet', outletFilter)
+      if (locFilter.length)    q = q.in('current_loc_code', locFilter)
+      if (timeFilter)          q = (q as any).eq('drink_profiles.preferred_time_slot', timeFilter)
+      if (drinkFilter.length)  q = (q as any).in('drink_profiles.favourite_drink', drinkFilter)
       return q
     })
   )
@@ -104,7 +108,7 @@ export default async function SegmentsPage({
   ) as Record<Segment, number>
 
   // ── Main query ─────────────────────────────────────────────────────────────
-  const needsDrinkJoin = !!(timeFilter || drinkFilter)
+  const needsDrinkJoin = !!(timeFilter || drinkFilter.length)
   const selectStr = needsDrinkJoin
     ? 'crm_id, first_name, last_name, mobile, segment, rfm_r, rfm_f, rfm_m, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, favourite_item, drink_profiles!inner(preferred_time_slot, favourite_drink)'
     : 'crm_id, first_name, last_name, mobile, segment, rfm_r, rfm_f, rfm_m, total_visits, last_visit_date, avg_gap_days, points_balance, outlet_count, favourite_item'
@@ -113,28 +117,28 @@ export default async function SegmentsPage({
     .select(needsDrinkJoin ? '*, drink_profiles!inner(preferred_time_slot, favourite_drink)' : '*',
       { count: 'exact', head: true })
     .eq('is_active', 1)
-  if (activeSegment) countQ = countQ.eq('segment', activeSegment)
-  if (rfmR.length)   countQ = countQ.in('rfm_r', rfmR)
-  if (rfmF.length)   countQ = countQ.in('rfm_f', rfmF)
-  if (rfmM.length)   countQ = countQ.in('rfm_m', rfmM)
-  if (outletFilter)  countQ = countQ.eq('favourite_outlet', outletFilter)
-  if (locFilter)     countQ = countQ.eq('current_loc_code', locFilter)
-  if (timeFilter)    countQ = (countQ as any).eq('drink_profiles.preferred_time_slot', timeFilter)
-  if (drinkFilter)   countQ = (countQ as any).eq('drink_profiles.favourite_drink', drinkFilter)
+  if (activeSegment)       countQ = countQ.eq('segment', activeSegment)
+  if (rfmR.length)         countQ = countQ.in('rfm_r', rfmR)
+  if (rfmF.length)         countQ = countQ.in('rfm_f', rfmF)
+  if (rfmM.length)         countQ = countQ.in('rfm_m', rfmM)
+  if (outletFilter.length) countQ = countQ.in('favourite_outlet', outletFilter)
+  if (locFilter.length)    countQ = countQ.in('current_loc_code', locFilter)
+  if (timeFilter)          countQ = (countQ as any).eq('drink_profiles.preferred_time_slot', timeFilter)
+  if (drinkFilter.length)  countQ = (countQ as any).in('drink_profiles.favourite_drink', drinkFilter)
 
   let custQ = supabase.from('customers')
     .select(selectStr)
     .eq('is_active', 1)
     .order('last_visit_date', { ascending: false, nullsFirst: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-  if (activeSegment) custQ = custQ.eq('segment', activeSegment)
-  if (rfmR.length)   custQ = custQ.in('rfm_r', rfmR)
-  if (rfmF.length)   custQ = custQ.in('rfm_f', rfmF)
-  if (rfmM.length)   custQ = custQ.in('rfm_m', rfmM)
-  if (outletFilter)  custQ = custQ.eq('favourite_outlet', outletFilter)
-  if (locFilter)     custQ = custQ.eq('current_loc_code', locFilter)
-  if (timeFilter)    custQ = (custQ as any).eq('drink_profiles.preferred_time_slot', timeFilter)
-  if (drinkFilter)   custQ = (custQ as any).eq('drink_profiles.favourite_drink', drinkFilter)
+  if (activeSegment)       custQ = custQ.eq('segment', activeSegment)
+  if (rfmR.length)         custQ = custQ.in('rfm_r', rfmR)
+  if (rfmF.length)         custQ = custQ.in('rfm_f', rfmF)
+  if (rfmM.length)         custQ = custQ.in('rfm_m', rfmM)
+  if (outletFilter.length) custQ = custQ.in('favourite_outlet', outletFilter)
+  if (locFilter.length)    custQ = custQ.in('current_loc_code', locFilter)
+  if (timeFilter)          custQ = (custQ as any).eq('drink_profiles.preferred_time_slot', timeFilter)
+  if (drinkFilter.length)  custQ = (custQ as any).in('drink_profiles.favourite_drink', drinkFilter)
 
   const [{ count: totalCount }, { data: customers }] = await Promise.all([countQ, custQ])
 
@@ -173,9 +177,9 @@ export default async function SegmentsPage({
           {rfmF.length > 0 && <span>F={rfmF.join(',')}</span>}
           {rfmM.length > 0 && <span>M={rfmM.join(',')}</span>}
           {timeFilter && <span className="text-sky-400">{timeFilter.charAt(0)+timeFilter.slice(1).toLowerCase()}</span>}
-          {outletFilter && <span className="text-violet-400">{outletFilter}</span>}
-          {locFilter && <span className="text-emerald-400">Loc: {locFilter}</span>}
-          {drinkFilter && <span className="text-amber-400 truncate max-w-[180px]">{drinkFilter}</span>}
+          {outletFilter.length > 0 && <span className="text-violet-400">{outletFilter.join(', ')}</span>}
+          {locFilter.length > 0 && <span className="text-emerald-400">Loc: {locFilter.join(', ')}</span>}
+          {drinkFilter.length > 0 && <span className="text-amber-400 truncate max-w-[240px]">{drinkFilter.join(', ')}</span>}
           <span className="text-stone-600">·</span>
           <span className="text-stone-300 font-semibold tabular-nums">{total.toLocaleString()} customers</span>
         </div>
