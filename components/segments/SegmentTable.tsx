@@ -20,6 +20,7 @@ interface Customer {
   points_balance: number | null
   outlet_count: number | null
   favourite_item: string | null
+  favourite_drink: string | null
 }
 
 type SortKey = 'name' | 'visits' | 'last_visit' | 'avg_gap' | 'points' | 'rfm'
@@ -221,7 +222,7 @@ export function SegmentTable({ customers, total, segment, rfmR, rfmF, rfmM }: Pr
                       }
                     </td>
                     <td className="px-4 py-3 text-stone-400 text-xs max-w-[160px] truncate">
-                      {c.favourite_item ?? <span className="text-stone-600">-</span>}
+                      {(c.favourite_drink ?? c.favourite_item) ?? <span className="text-stone-600">-</span>}
                     </td>
                     <td className="px-4 py-3">
                       <ExternalLink size={13} className="opacity-0 group-hover:opacity-60 transition-opacity duration-150 text-stone-400" />

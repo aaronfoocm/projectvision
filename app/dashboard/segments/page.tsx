@@ -144,7 +144,10 @@ export default async function SegmentsPage({
 
   const total      = totalCount ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const cleanCustomers = (customers ?? []).map(({ drink_profiles: _dp, ...c }: any) => c)
+  const cleanCustomers = (customers ?? []).map(({ drink_profiles: dp, ...c }: any) => ({
+    ...c,
+    favourite_drink: (dp as any)?.favourite_drink ?? null,
+  }))
 
   return (
     <div className="p-8 max-w-7xl">
