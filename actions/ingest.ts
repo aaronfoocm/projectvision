@@ -226,6 +226,7 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
   const billItemsToInsert: Record<string, unknown>[] = []
   const segmentHistoryToInsert: Record<string, unknown>[] = []
   const journalEntriesToInsert: JourneyLogEntry[] = []
+  const visits60Map = new Map<string, number>()
 
   for (const [customerId, txns] of joined.customerTransactions) {
     const dbCustomer = existingById.get(customerId)
@@ -254,6 +255,7 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
 
     const cutoff60 = new Date(today.getTime() - 60 * 86_400_000)
     const visits60 = sorted.filter(t => new Date(t.transaction_date!) >= cutoff60)
+    visits60Map.set(customerId, visits60.length)
     const gaps60: number[] = []
     for (let i = 1; i < visits60.length; i++) {
       gaps60.push(Math.floor((new Date(visits60[i].transaction_date!).getTime() - new Date(visits60[i - 1].transaction_date!).getTime()) / 86_400_000))
@@ -380,7 +382,7 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
     .map(c => ({
       crm_id: c.crm_id!,
       last_visit_date: c.last_visit_date!,
-      visits_in_last_90_days: c.total_visits ?? 0,
+      visits_in_last_60_days: visits60Map.get(c.crm_id!) ?? 0,
       avg_spend: (c.total_visits ?? 0) > 0 ? (existingById.get(c.crm_id!)?.points_balance ?? 0) / (c.total_visits ?? 1) : 0,
     }))
   const rfmScores = computeRfmScores(rfmInputs)

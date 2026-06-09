@@ -1,7 +1,7 @@
 export interface RfmInput {
   crm_id: string
   last_visit_date: string | null
-  visits_in_last_90_days: number
+  visits_in_last_60_days: number
   avg_spend: number
 }
 
@@ -13,6 +13,22 @@ export interface RfmScores {
 
 function daysSince(dateStr: string, today: Date): number {
   return Math.floor((today.getTime() - new Date(dateStr).getTime()) / 86_400_000)
+}
+
+function rScore(daysAgo: number): number {
+  if (daysAgo <= 7) return 5
+  if (daysAgo <= 14) return 4
+  if (daysAgo <= 30) return 3
+  if (daysAgo <= 60) return 2
+  return 1
+}
+
+function fScore(visits60: number): number {
+  if (visits60 >= 8) return 5
+  if (visits60 >= 4) return 4
+  if (visits60 >= 2) return 3
+  if (visits60 >= 1) return 2
+  return 1
 }
 
 function quintileScore(value: number, sorted: number[], higherIsBetter: boolean): number {
@@ -27,18 +43,14 @@ export function computeRfmScores(
   customers: RfmInput[],
   today: Date = new Date(),
 ): Map<string, RfmScores> {
-  const recencies = customers
-    .map(c => (c.last_visit_date ? daysSince(c.last_visit_date, today) : 99_999))
-    .sort((a, b) => a - b)
-  const frequencies = customers.map(c => c.visits_in_last_90_days).sort((a, b) => a - b)
   const monetaries = customers.map(c => c.avg_spend).sort((a, b) => a - b)
 
   const result = new Map<string, RfmScores>()
   for (const c of customers) {
-    const recency = c.last_visit_date ? daysSince(c.last_visit_date, today) : 99_999
+    const daysAgo = c.last_visit_date ? daysSince(c.last_visit_date, today) : 99_999
     result.set(c.crm_id, {
-      rfm_r: quintileScore(recency, recencies, false),
-      rfm_f: quintileScore(c.visits_in_last_90_days, frequencies, true),
+      rfm_r: rScore(daysAgo),
+      rfm_f: fScore(c.visits_in_last_60_days),
       rfm_m: quintileScore(c.avg_spend, monetaries, true),
     })
   }
