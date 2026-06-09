@@ -5,9 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { SegmentCard } from '@/components/dashboard/SegmentCard'
 import { FilterChips } from '@/components/dashboard/FilterChips'
 import { TrendChart } from '@/components/dashboard/TrendChart'
+import { ALL_SEGMENTS } from '@/lib/segment-meta'
 import type { Segment } from '@/lib/types'
-
-const ALL_SEGMENTS: Segment[] = ['Regular', 'Explorer', 'Flickerer', 'Ghost', 'Hoarder', 'GroupBuyer', 'Dormant']
 
 interface SearchParams { temp?: string; time?: string; milk?: string }
 
@@ -73,8 +72,9 @@ export default async function DashboardPage({
   })
   const trend = trendDates.map(date => ({
     date: date.slice(5),
+    Champion: counts.Champion,
     Regular: counts.Regular,
-    Flickerer: counts.Flickerer,
+    AtRisk: counts.AtRisk,
     Ghost: counts.Ghost,
     Dormant: counts.Dormant,
   }))
@@ -112,7 +112,7 @@ export default async function DashboardPage({
         <FilterChips />
       </Suspense>
 
-      <div className="grid grid-cols-7 gap-3 mb-8">
+      <div className="grid grid-cols-4 gap-3 mb-8">
         {ALL_SEGMENTS.map(seg => (
           <SegmentCard
             key={seg}

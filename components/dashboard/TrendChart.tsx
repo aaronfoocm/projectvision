@@ -3,8 +3,9 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } fro
 
 interface TrendPoint {
   date: string
+  Champion: number
   Regular: number
-  Flickerer: number
+  AtRisk: number
   Ghost: number
   Dormant: number
 }
@@ -20,10 +21,11 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           labelStyle={{ color: '#a8a29e' }}
         />
         <Legend wrapperStyle={{ fontSize: 11, color: '#a8a29e' }} />
-        <Bar dataKey="Regular"   stackId="a" fill="#4ade80" />
-        <Bar dataKey="Flickerer" stackId="a" fill="#fb923c" />
-        <Bar dataKey="Ghost"     stackId="a" fill="#f87171" />
-        <Bar dataKey="Dormant"   stackId="a" fill="#78716c" radius={[2,2,0,0]} />
+        <Bar dataKey="Champion" stackId="a" fill="#f59e0b" />
+        <Bar dataKey="Regular"  stackId="a" fill="#4ade80" />
+        <Bar dataKey="AtRisk"   stackId="a" fill="#fb923c" />
+        <Bar dataKey="Ghost"    stackId="a" fill="#f87171" />
+        <Bar dataKey="Dormant"  stackId="a" fill="#78716c" radius={[2,2,0,0]} />
       </BarChart>
     </ResponsiveContainer>
   )

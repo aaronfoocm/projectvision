@@ -219,12 +219,9 @@ async function processPair(csv1File: string, csv2File: string, pairIdx: number) 
     billItemsToInsert.push(...(billItems as unknown as Record<string, unknown>[]))
 
     const triggered = computeTriggers({
-      crm_id: customerId, segment, days_since_last_visit: daysSinceLast, avg_gap_days: avgGap,
+      crm_id: customerId, segment, days_since_last_visit: daysSinceLast,
       total_visits: totalVisits, points_balance: pointsBalance, avg_spend: avgSpend,
-      total_visits_all_time: totalVisits, registered_days_ago: 9999,
-      last_actions: journeyByCustomer.get(customerId) ?? [],
-      new_outlet_visited: newOutletVisited, large_order_days_ago: largeOrderDaysAgo,
-      avg_item_quantity: avgItemQty, first_redemption_this_upload: firstRedemptionThisUpload,
+      registered_days_ago: 9999, last_actions: journeyByCustomer.get(customerId) ?? [],
     }, today)
 
     for (const action of triggered) {
