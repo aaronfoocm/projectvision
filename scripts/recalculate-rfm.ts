@@ -126,8 +126,16 @@ async function main() {
   console.log('\nR score distribution:', JSON.stringify(rDist))
   console.log('F score distribution:', JSON.stringify(fDist))
 
+  // ── Step 5b: NeverTransacted customers get R1 F1 M1 ─────────────────────
+  console.log('\nSetting R1 F1 M1 for NeverTransacted customers (no last_visit_date)...')
+  const { error: ntError } = await sb
+    .from('customers')
+    .update({ rfm_r: 1, rfm_f: 1, rfm_m: 1, last_updated: today.toISOString() })
+    .is('last_visit_date', null)
+  if (ntError) throw new Error(`NeverTransacted update: ${ntError.message}`)
+
   // ── Step 6: Upsert in batches ─────────────────────────────────────────────
-  console.log(`\nUpdating ${updates.length} customers...`)
+  console.log(`Updating ${updates.length} customers with visits...`)
   const BATCH = 500
   let done = 0
   for (let i = 0; i < updates.length; i += BATCH) {
