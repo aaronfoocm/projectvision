@@ -302,12 +302,9 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
     const registeredDaysAgo = 9999
 
     const segment = assignSegment({
-      crm_id: customerId, total_visits: totalVisits, outlet_count: outletCodes.size,
-      visits_last_60_days: visits60.length, max_gap_last_60_days: maxGap60,
-      last_visit_days_ago: daysSinceLast, avg_gap_days: avgGap,
-      points_balance: pointsBalance, voucher_redeemed: voucherRedeemed,
-      avg_item_quantity: avgItemQty, has_bill_with_qty_5_plus: hasBigOrder,
-      registered_days_ago: registeredDaysAgo,
+      crm_id: customerId,
+      total_visits: totalVisits,
+      last_visit_days_ago: daysSinceLast,
     })
 
     const prior = dbCustomer
@@ -347,12 +344,9 @@ export async function ingestTransactions(storagePath1: string, storagePath2: str
 
     const lastActions = journeyByCustomer.get(customerId) ?? []
     const triggered = computeTriggers({
-      crm_id: customerId, segment, days_since_last_visit: daysSinceLast, avg_gap_days: avgGap,
+      crm_id: customerId, segment, days_since_last_visit: daysSinceLast,
       total_visits: totalVisits, points_balance: pointsBalance, avg_spend: avgSpend,
-      total_visits_all_time: totalVisits, registered_days_ago: registeredDaysAgo,
-      last_actions: lastActions, new_outlet_visited: newOutletVisited,
-      large_order_days_ago: largeOrderDaysAgo, avg_item_quantity: avgItemQty,
-      first_redemption_this_upload: firstRedemptionThisUpload,
+      registered_days_ago: registeredDaysAgo, last_actions: lastActions,
     }, today)
 
     for (const action of triggered) {

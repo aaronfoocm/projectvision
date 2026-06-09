@@ -25,21 +25,14 @@ async function fetchAll(query) {
 }
 
 // ── Segment assignment (mirrors lib/ingestion/segments.ts logic) ──────────────
-function assignSegment(p) {
-  const {
-    total_visits, outlet_count, visits_last_60_days, max_gap_last_60_days,
-    last_visit_days_ago, avg_gap_days, points_balance, voucher_redeemed,
-    avg_item_quantity, has_bill_with_qty_5_plus, registered_days_ago,
-  } = p
-
-  if (total_visits === 0) return 'Ghost'
-  if (last_visit_days_ago > 90) return 'Dormant'
-  if (has_bill_with_qty_5_plus || avg_item_quantity >= 4) return 'GroupBuyer'
-  if (points_balance >= 80 && total_visits >= 5) return 'Hoarder'
-  if (outlet_count >= 3 || (outlet_count >= 2 && total_visits >= 6)) return 'Explorer'
-  if (visits_last_60_days >= 4 && max_gap_last_60_days <= 21) return 'Regular'
-  if (visits_last_60_days >= 2 && max_gap_last_60_days <= 30) return 'Flickerer'
-  if (total_visits >= 2) return 'Flickerer'
+function assignSegment({ total_visits, last_visit_days_ago }) {
+  if (total_visits === 0) return 'NeverTransacted'
+  if (last_visit_days_ago <= 14 && total_visits >= 4) return 'Champion'
+  if (last_visit_days_ago <= 30 && total_visits >= 3) return 'Regular'
+  if (last_visit_days_ago <= 30) return 'NewTrial'
+  if (last_visit_days_ago <= 60 && total_visits >= 3) return 'AtRisk'
+  if (last_visit_days_ago > 60 && total_visits >= 6) return 'LapsedLoyal'
+  if (last_visit_days_ago > 60 && total_visits >= 2) return 'Dormant'
   return 'Ghost'
 }
 
@@ -128,20 +121,7 @@ for (const [customerId, txns] of txnsByCustomer) {
     ? txns.reduce((s, t) => s + (t.net_sales ?? 0), 0) / totalVisits
     : 0
 
-  const segment = assignSegment({
-    crm_id: customerId,
-    total_visits: totalVisits,
-    outlet_count: outletCodes.size,
-    visits_last_60_days: visits60.length,
-    max_gap_last_60_days: maxGap60,
-    last_visit_days_ago: daysSinceLast,
-    avg_gap_days: avgGap,
-    points_balance: pointsBalance,
-    voucher_redeemed: 0,
-    avg_item_quantity: avgItemQty,
-    has_bill_with_qty_5_plus: hasBigOrder,
-    registered_days_ago: 9999,
-  })
+  const segment = assignSegment({ total_visits: totalVisits, last_visit_days_ago: daysSinceLast })
 
   updates.push({
     crm_id: customerId,

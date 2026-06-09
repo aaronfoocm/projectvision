@@ -189,12 +189,9 @@ async function processPair(csv1File: string, csv2File: string, pairIdx: number) 
       : null
 
     const segment = assignSegment({
-      crm_id: customerId, total_visits: totalVisits, outlet_count: outletCodes.size,
-      visits_last_60_days: visits60.length, max_gap_last_60_days: maxGap60,
-      last_visit_days_ago: daysSinceLast, avg_gap_days: avgGap,
-      points_balance: pointsBalance, voucher_redeemed: voucherRedeemed,
-      avg_item_quantity: avgItemQty, has_bill_with_qty_5_plus: hasBigOrder,
-      registered_days_ago: 9999,
+      crm_id: customerId,
+      total_visits: totalVisits,
+      last_visit_days_ago: daysSinceLast,
     })
 
     const prior = existingById.get(customerId)

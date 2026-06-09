@@ -3,12 +3,12 @@ import { TEMPLATES, resolveTemplate } from './templates'
 
 describe('resolveTemplate', () => {
   it('replaces {favourite_item} placeholder', () => {
-    const msg = resolveTemplate('FLICKERER_WINBACK', { favourite_item: 'Iced Latte' })
+    const msg = resolveTemplate('GHOST_SINGLE_PUSH', { favourite_item: 'Iced Latte' })
     expect(msg).toContain('Iced Latte')
     expect(msg).not.toContain('{favourite_item}')
   })
   it('replaces {points_balance} placeholder', () => {
-    const msg = resolveTemplate('FLICKERER_POINTS_NUDGE', { points_balance: '250', favourite_item: 'Mocha' })
+    const msg = resolveTemplate('AT_RISK_WINBACK', { first_name: 'Aaron', points_balance: '250', favourite_item: 'Mocha' })
     expect(msg).toContain('250')
   })
   it('leaves unreplaced placeholders if value missing', () => {
@@ -16,7 +16,16 @@ describe('resolveTemplate', () => {
     expect(msg).toContain('{total_visits}')
   })
   it('all required template keys exist', () => {
-    const required = ['GHOST_DAY14', 'GHOST_DAY30_FINAL', 'FLICKERER_WINBACK', 'DORMANT_FIRST_NUDGE', 'DORMANT_FINAL_NUDGE']
+    const required = [
+      'CHAMPION_THANK_YOU', 'CHAMPION_EARLY_ACCESS',
+      'REGULAR_MILESTONE', 'REGULAR_STREAK', 'REGULAR_POINTS_NUDGE',
+      'NEW_TRIAL_48H', 'NEW_TRIAL_PROFILE',
+      'AT_RISK_WINBACK', 'AT_RISK_WEEKLY',
+      'LAPSED_LOYAL_COMEBACK_1', 'LAPSED_LOYAL_COMEBACK_2',
+      'DORMANT_POINTS_EXPIRY',
+      'GHOST_SINGLE_PUSH',
+      'NEVER_TRANSACTED_ACTIVATION',
+    ]
     for (const key of required) expect(TEMPLATES[key]).toBeDefined()
   })
 })

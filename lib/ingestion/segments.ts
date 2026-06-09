@@ -3,25 +3,16 @@ import type { Segment } from '@/lib/types'
 export interface SegmentInput {
   crm_id: string
   total_visits: number
-  outlet_count: number
-  visits_last_60_days: number
-  max_gap_last_60_days: number
-  last_visit_days_ago: number
-  avg_gap_days: number
-  points_balance: number
-  voucher_redeemed: number
-  avg_item_quantity: number
-  has_bill_with_qty_5_plus: boolean
-  registered_days_ago: number
+  last_visit_days_ago: number  // pass 9999 when no visits on record
 }
 
 export function assignSegment(c: SegmentInput): Segment {
-  if (c.outlet_count >= 3 && c.total_visits >= 3) return 'Explorer'
-  if (c.visits_last_60_days >= 3 && c.max_gap_last_60_days <= 30) return 'Regular'
-  if (c.has_bill_with_qty_5_plus && c.avg_item_quantity >= 3) return 'GroupBuyer'
-  if (c.total_visits >= 3 && c.points_balance > 100 && c.voucher_redeemed === 0) return 'Hoarder'
-  if (c.total_visits >= 2 && c.total_visits <= 4 && c.last_visit_days_ago > c.avg_gap_days * 1.5 && c.last_visit_days_ago > 45) return 'Flickerer'
-  if (c.total_visits === 1 || (c.last_visit_days_ago > 90 && c.total_visits < 2)) return 'Ghost'
-  if (c.total_visits === 0) return 'Dormant'
+  if (c.total_visits === 0) return 'NeverTransacted'
+  if (c.last_visit_days_ago <= 14 && c.total_visits >= 4) return 'Champion'
+  if (c.last_visit_days_ago <= 30 && c.total_visits >= 3) return 'Regular'
+  if (c.last_visit_days_ago <= 30) return 'NewTrial'
+  if (c.last_visit_days_ago <= 60 && c.total_visits >= 3) return 'AtRisk'
+  if (c.last_visit_days_ago > 60 && c.total_visits >= 6) return 'LapsedLoyal'
+  if (c.last_visit_days_ago > 60 && c.total_visits >= 2) return 'Dormant'
   return 'Ghost'
 }

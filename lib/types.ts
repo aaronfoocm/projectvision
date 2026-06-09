@@ -1,11 +1,12 @@
 export type Segment =
+  | 'Champion'
   | 'Regular'
-  | 'Explorer'
-  | 'Flickerer'
-  | 'Ghost'
-  | 'Hoarder'
-  | 'GroupBuyer'
+  | 'NewTrial'
+  | 'AtRisk'
+  | 'LapsedLoyal'
   | 'Dormant'
+  | 'Ghost'
+  | 'NeverTransacted'
 
 export type PreferredTemp = 'ICED' | 'HOT' | 'BOTH'
 export type TimeSlot = 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NIGHT'
